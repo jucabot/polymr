@@ -1,11 +1,8 @@
 import traceback
-from polymr.inout import FileInputReader, KeyValueOutputWriter
 from multiprocessing import cpu_count
 import datetime
 import math
 from polymr import merge_kv_dict, load_from_classname, mem
-from polymr.file import parse_filenames
-import polymr.mem
 from polymr.inout import MemInputReader
 from multiprocessing.process import Process
 from multiprocessing.queues import Queue
@@ -19,28 +16,27 @@ class SingleCoreEngine():
     def __init__(self,mapred):
         self._mapred = mapred    
     
-    def run(self,input_reader=FileInputReader(),output_writer=KeyValueOutputWriter()):
+    def run(self,input_reader,output_writer):
         
         start_time = datetime.datetime.now()
         self._mapred.reset()
         
         print "start job %s on a single core" % self._mapred.__class__.__name__
         
-        map_len = self._mapred.run_map(self._mapred.input_file,input_reader)
-        print "map %s lines with mem size of %d" % (map_len,mem.asizeof(self._mapred))
+        map_len = self._mapred.run_map(input_reader)
+        #print "map %s lines with mem size of %d" % (map_len,mem.asizeof(self._mapred))
         
         if "combine" in dir(self._mapred):
             combine_len = self._mapred.run_combine(self._mapred.data.items())
-            print "combine %s lines" % (combine_len)
+            #print "combine %s lines" % (combine_len)
         
         if "reduce" not in dir(self._mapred):
             self._mapred.data_reduced = self._mapred.data
         else:
-            
             reduce_len = self._mapred.run_reduce(self._mapred.data.items())
-            print "reduce %s lines" % (reduce_len)
+            #print "reduce %s lines" % (reduce_len)
             
-        output_writer.write(self._mapred.post_reduce(),self._mapred.output_file)
+        output_writer.write(self._mapred.post_reduce())
         
         print "end job %s in %s with mem size of %d" % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self._mapred))
     
@@ -57,12 +53,12 @@ def q_run_mapper(mapred_mod, mapred_class,mapred_params, in_queue, out_queue,log
             
             
             if isinstance(data, str) and data == 'STOP':
-                log_queue.put("INFO: receive stop command")
+                #log_queue.put("INFO: receive stop command")
                 break
             else:
-                log_queue.put("INFO: map %d lines" % len(data))
+                #log_queue.put("INFO: map %d lines" % len(data))
                 input_data = MemInputReader(data)     
-                mapred.run_map(None,input_data)
+                mapred.run_map(input_data)
         
         if "combine" in dir(mapred):
             mapred.run_combine(mapred.data.items())
@@ -82,10 +78,10 @@ def q_run_reducer(mapred_mod,mapred_class,mapred_params,in_queue, out_queue,log_
             data = in_queue.get()
             
             if isinstance(data, str) and data == "STOP":
-                log_queue.put("INFO: receive stop command")
+                #log_queue.put("INFO: receive stop command")
                 break
             else :
-                log_queue.put("INFO: reduce %d lines" % len(data))
+                #log_queue.put("INFO: reduce %d lines" % len(data))
                 mapred.run_reduce(data.items())
             
         out_queue.put(mapred.data_reduced)
@@ -207,30 +203,24 @@ class MultiCoreEngine():
         self._start("mapper",cpu, self._mapred.__class__.__module__,self._mapred.__class__.__name__ ,self._mapred.params)
     
         try:
-            
-            input_names = parse_filenames(self._mapred.input_file)
-            for input_name in input_names:
-                f = input_reader.read(input_name)
-            
-                for line in f:
-                    
-                    try:
-                        print self._log_queue.get_nowait()
-                    except Empty:
-                        pass
-                    
-                    lines_len = len(lines)
-                    if  lines_len > 0 and lines_len % cache_line == 0:
-                        
-                        self._send_lines(lines, cpu, lines_len)
-                                   
-                        lines = []
-                   
-                    lines.append(line)
-                    map_len += 1
-                        
-                input_reader.close()
+            f = input_reader.read()
+        
+            for line in f:
+                try:
+                    print self._log_queue.get_nowait()
+                except Empty:
+                    pass
                 
+                lines_len = len(lines)
+                if  lines_len > 0 and lines_len % cache_line == 0:
+                    self._send_lines(lines, cpu, lines_len)        
+                    lines = []
+               
+                lines.append(line)
+                map_len += 1
+                    
+            input_reader.close()
+            
             lines_len = len(lines)
             self._send_lines(lines, cpu, lines_len)
             
@@ -272,7 +262,7 @@ class MultiCoreEngine():
             
         return len(self._mapred.data_reduced.keys())
     
-    def run(self,input_reader=FileInputReader(),output_writer=KeyValueOutputWriter(),cpu=cpu_count()-1, cache_line=100000):
+    def run(self,input_reader,output_writer,cpu=cpu_count()-1, cache_line=100000):
         
         start_time = datetime.datetime.now()
         
@@ -280,7 +270,7 @@ class MultiCoreEngine():
         
         map_len = self._run_map(cpu, cache_line, input_reader)
                 
-        print "map %s lines in %s with mem size of %d" % (map_len, datetime.datetime.now()-start_time,mem.asizeof(self._mapred))
+        #print "map %s lines in %s with mem size of %d" % (map_len, datetime.datetime.now()-start_time,mem.asizeof(self._mapred))
 
         if "reduce" not in dir(self._mapred):
             
@@ -291,8 +281,8 @@ class MultiCoreEngine():
                 reduce_len = self._mapred.run_reduce(self._mapred.data.items())
             else:
                 reduce_len = self._run_reduce(cpu)
-            print "reduce %s lines in %s with mem size of %d" % (reduce_len, datetime.datetime.now()-start_time,mem.asizeof(self._mapred))
+            #print "reduce %s lines in %s with mem size of %d" % (reduce_len, datetime.datetime.now()-start_time,mem.asizeof(self._mapred))
             
-        output_writer.write(self._mapred.post_reduce(),self._mapred.output_file)
+        output_writer.write(self._mapred.post_reduce())
         
         print "end job %s in %s with mem size of %d"  % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self))

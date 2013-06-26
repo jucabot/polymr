@@ -160,23 +160,20 @@ def start_master():
                         
                         map_len = 0
                         lines = []
-                        input_reader = FileInputReader()
-                        input_names = parse_filenames(data)
+                        input_reader = FileInputReader(data)
                         
                         cmd.send_response(True)
+                        f = input_reader.read()
                         
-                        for input_name in input_names:
-                            f = input_reader.read(input_name)
-                            
-                            for line in f:
-                                lines_len = len(lines)
-                                if  lines_len > 0 and lines_len % cache_line == 0:
-                                    print "submitting %d lines to the cluster..." % (map_len)
-                                    mapper_data_in_cmd.send_command(job_id, lines)                   
-                                    lines = []
-                               
-                                lines.append(line)
-                                map_len += 1
+                        for line in f:
+                            lines_len = len(lines)
+                            if  lines_len > 0 and lines_len % cache_line == 0:
+                                print "submitting %d lines to the cluster..." % (map_len)
+                                mapper_data_in_cmd.send_command(job_id, lines)                   
+                                lines = []
+                           
+                            lines.append(line)
+                            map_len += 1
                                     
                         input_reader.close()
                         

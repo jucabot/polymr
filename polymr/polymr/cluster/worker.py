@@ -67,7 +67,7 @@ def zmq_run_mapper(command_queue_name, task_queue_name, in_queue_name, out_queue
                 map_length = len(data)
                 tc.send_command("receive-input-data", {"job_id":job_id,"task_id":task_id,"map-length": map_length})
                 input_data = MemInputReader(data)     
-                mapred.run_map(None,input_data)
+                mapred.run_map(input_data)
                 
             if socks.get(command_queue) == zmq.POLLIN:
                 

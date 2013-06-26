@@ -20,7 +20,8 @@ if __name__ == '__main__':
     mod_name = sys.argv[1]
     class_name = sys.argv[2]
     cache_file = sys.argv[3]
-     
+    
+  
     mapred = load_from_classname(mod_name,class_name)
     mapred.params = json.load(open(cache_file))
     mapred.verbose = False
@@ -28,3 +29,7 @@ if __name__ == '__main__':
     
     for line in sys.stdin:
         mapred.map(line)
+        
+   
+    
+    

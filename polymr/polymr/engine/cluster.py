@@ -1,11 +1,12 @@
 
 import polymr.settings
-from polymr.inout import FileInputReader, KeyValueOutputWriter
+
 import datetime
 import json
 from polymr import Command, settings
 import polymr.mem
 import zmq
+from polymr.inout import FileInputReader
 
 
 
@@ -24,12 +25,14 @@ class MasterWorkerEngine():
         self._mapred = mapred
         
     
-    def _run_map(self,input_reader ):
+    def _run_map(self,input_reader):
         
+        assert isinstance(input_reader, FileInputReader), "input reader has to be FileInputReader"
+       
         command = "send-data-map"
         args = {
             'job_id' : self._job_id,
-            'data' : self._mapred.input_file ,
+            'data' : input_reader.filename ,
             'cache-line' : self.cache_line,
             }
         self._master_queue.send("%s|%s" % (command,json.dumps(args)))
@@ -39,7 +42,7 @@ class MasterWorkerEngine():
         self._master_queue.send("%s|%s" % (command,json.dumps(args)))
         return json.loads(self._master_queue.recv())
     
-    def run(self,input_reader=FileInputReader(),output_writer=KeyValueOutputWriter()):
+    def run(self,input_reader,output_writer):
         
         start_time = datetime.datetime.now()
         

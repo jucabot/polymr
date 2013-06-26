@@ -9,53 +9,8 @@ from polymr.file import path
 from polymr import merge_kv_dict
 
 
-class TestMapRed1(MapReduce):
-    """
-        List the count of messages
-    """
-    
-    def map(self, text):
-        self.collect('count',1)
-                
 
-class TestMapRed2(MapReduce):
-    """
-        List the count of messages
-    """
-    
-    def map(self, text):
-        self.collect('count',1)
-                        
-    def reduce(self, key, values):
-        self.emit(key, sum(values))
 
-class TestMapRed3(MapReduce):
-    """
-        List the count of messages
-    """
-    
-    def map(self, text):
-        self.collect('count',1)
-        
-    def combine(self, key, values):
-        self.compact(key, sum(values))
-                        
-    def reduce(self, key, values):
-        self.emit(key, sum(values))
-
-class CountMapRed(MapReduce):
-    """
-        List the count of messages
-    """
-    
-    def map(self, text):
-        self.collect('count',1)
-                
-    def combine(self, key, values):
-        self.compact(key, sum(values))
-        
-    def reduce(self, key, values):
-        self.emit(key, sum(values))
 
 class JoinMapRed(MapReduce):
     """
@@ -136,3 +91,4 @@ class ExcludeMapRed(FilterMapRed):
         
         if key not in self.params["filters"]:
             self.collect(key, value)
+            
