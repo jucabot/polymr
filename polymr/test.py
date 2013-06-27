@@ -22,7 +22,7 @@ class Count(MapReduce):
         
 if __name__ == '__main__':
 
-    sample_input = FileInputReader("_test/sample_large.txt")
+    sample_input = FileInputReader("/home/predictiveds/Dropbox/polymr/sample.txt")
     out = MemOutputWriter()
 
     print "Test engine - Single core"
@@ -37,11 +37,5 @@ if __name__ == '__main__':
     print "Test engine - local hadoop"
     Count().run(sample_input,out,engine="local-hadoop")
     print out.data[0][1][0]
-   
-    """
-    print "Test engine - cluster"
-    Count().run(sample_input,out,engine="cluster")
-    print out.data[0][1][0]
-    """
-    
+       
     print "Test completed"

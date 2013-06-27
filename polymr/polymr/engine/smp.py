@@ -10,6 +10,10 @@ from Queue import Empty
 
 
 class SingleCoreEngine():
+    """
+        Single thread MapReduce engine
+        Use only one CPU, suitable for debugging or low latency map/reduce function
+    """
     
     _mapred = None
     
@@ -21,37 +25,32 @@ class SingleCoreEngine():
         start_time = datetime.datetime.now()
         self._mapred.reset()
         
-        print "start job %s on a single core" % self._mapred.__class__.__name__
+        print "INFO:start job %s on a single core" % self._mapred.__class__.__name__
         
-        map_len = self._mapred.run_map(input_reader)
-        #print "map %s lines with mem size of %d" % (map_len,mem.asizeof(self._mapred))
+        self._mapred.run_map(input_reader)
         
         if "combine" in dir(self._mapred):
-            combine_len = self._mapred.run_combine(self._mapred.data.items())
-            #print "combine %s lines" % (combine_len)
+            self._mapred.run_combine(self._mapred.data.items())
+            
         
         if "reduce" not in dir(self._mapred):
             self._mapred.data_reduced = self._mapred.data
         else:
-            reduce_len = self._mapred.run_reduce(self._mapred.data.items())
-            #print "reduce %s lines" % (reduce_len)
+            self._mapred.run_reduce(self._mapred.data.items())
             
         output_writer.write(self._mapred.post_reduce())
         
-        print "end job %s in %s with mem size of %d" % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self._mapred))
+        print "INFO: end job %s in %s with mem size of %d" % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self._mapred))
     
 def q_run_mapper(mapred_mod, mapred_class,mapred_params, in_queue, out_queue,log_queue):
     
     try:
         mapred = load_from_classname(mapred_mod,mapred_class)
         mapred.params = mapred_params
-        mapred.verbose = False
-        
+       
         while True:
             
-            data = in_queue.get()
-            
-            
+            data = in_queue.get()     
             if isinstance(data, str) and data == 'STOP':
                 #log_queue.put("INFO: receive stop command")
                 break
@@ -139,8 +138,7 @@ class MultiCoreEngine():
     
     def _set_data_chunks(self, chunks):
         
-        for chunk in chunks:
-            self._in_queue.put(chunk)
+        map(self._in_queue.put,chunks)
         
                         
     def _send_lines(self,lines, cpu, lines_len ):
@@ -233,7 +231,7 @@ class MultiCoreEngine():
             
         
         except Exception,e:
-            print "Exception while mapping : %s\n%s" % (e,traceback.print_exc())
+            print "ERROR: Exception while mapping : %s\n%s" % (e,traceback.print_exc())
             self._force_terminate()
              
         return map_len
@@ -257,7 +255,7 @@ class MultiCoreEngine():
             self._terminate()
             
         except Exception,e:
-            print "Exception while reducing : %s\n%s" % (e,traceback.print_exc())
+            print "EROR: Exception while reducing : %s\n%s" % (e,traceback.print_exc())
             self._force_terminate()
             
         return len(self._mapred.data_reduced.keys())
@@ -266,23 +264,21 @@ class MultiCoreEngine():
         
         start_time = datetime.datetime.now()
         
-        print "start job %s on %d cores" % (self._mapred.__class__.__name__, cpu)
+        print "INFO: start job %s on %d cores" % (self._mapred.__class__.__name__, cpu)
         
-        map_len = self._run_map(cpu, cache_line, input_reader)
+        self._run_map(cpu, cache_line, input_reader)
                 
-        #print "map %s lines in %s with mem size of %d" % (map_len, datetime.datetime.now()-start_time,mem.asizeof(self._mapred))
-
+        
         if "reduce" not in dir(self._mapred):
             
             self._mapred.data_reduced = self._mapred.data
         
         else:
             if len(self._mapred.data) < cpu:
-                reduce_len = self._mapred.run_reduce(self._mapred.data.items())
+                self._mapred.run_reduce(self._mapred.data.items())
             else:
-                reduce_len = self._run_reduce(cpu)
-            #print "reduce %s lines in %s with mem size of %d" % (reduce_len, datetime.datetime.now()-start_time,mem.asizeof(self._mapred))
+                self._run_reduce(cpu)
             
         output_writer.write(self._mapred.post_reduce())
         
-        print "end job %s in %s with mem size of %d"  % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self))
+        print "INFO: end job %s in %s with mem size of %d"  % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self))

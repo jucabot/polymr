@@ -5,7 +5,6 @@ Created on 24 oct. 2012
 '''
 import json
 from polymr.mapreduce import MapReduce
-from polymr.file import path
 from polymr import merge_kv_dict
 
 
@@ -19,7 +18,7 @@ class JoinMapRed(MapReduce):
     
     def load_joiner_from_file(self,joiner_file):
        
-        f = open(path(joiner_file))
+        f = open(joiner_file)
         self._set_joiner(f)
         f.close()
         
@@ -53,7 +52,7 @@ class FilterMapRed(MapReduce):
     
     def load_filter_from_file(self,filter_file):
        
-        f = open(path(filter_file))
+        f = open(filter_file)
         self._set_filter(f)
         f.close()
         

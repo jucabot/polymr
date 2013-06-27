@@ -6,7 +6,7 @@ Created on 3 nov. 2012
 '''
 import sys
 from polymr import load_from_classname
-import json
+import cjson
 
 def check_usage():
     return len(sys.argv) == 4
@@ -23,12 +23,10 @@ if __name__ == '__main__':
     
   
     mapred = load_from_classname(mod_name,class_name)
-    mapred.params = json.load(open(cache_file))
-    mapred.verbose = False
+    mapred.params = cjson.decode(open(cache_file).read())
     mapred.streamming = True
     
-    for line in sys.stdin:
-        mapred.map(line)
+    map(mapred.map,sys.stdin)
         
    
     

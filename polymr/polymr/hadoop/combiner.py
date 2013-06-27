@@ -2,7 +2,7 @@
 import sys
 from itertools import groupby
 from operator import itemgetter
-import json
+import cjson
 from polymr import load_from_classname
 
 def read(f):
@@ -24,17 +24,20 @@ if __name__ == '__main__':
     cache_file = sys.argv[3]
      
     mapred = load_from_classname(mod_name,class_name)
-    mapred.params = json.load(open(cache_file))
-    mapred.verbose = False
+    mapred.params = cjson.decode(open(cache_file).read())
     mapred.streamming = True
  
-data = read(sys.stdin)
-    
-for key, group in groupby(data, itemgetter(0)):
-    values = [json.loads(item[1]) for item in group]
-    
-    if 'combine' in dir(mapred):
-        mapred.combine(key,list(values))
-    else:
-        print "%s;%s" % (key, json.dumps(values))
+    data = read(sys.stdin)
+
+    def combine(kv):
+        key,group = kv
+        values = [cjson.decode(item[1]) for item in group]
+        
+        if 'combine' in dir(mapred):
+            mapred.combine(key,list(values))
+        else:
+            print "%s;%s" % (key, cjson.encode(values))
+        
+    map(combine, groupby(data, itemgetter(0)))
+
 

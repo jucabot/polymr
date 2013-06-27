@@ -1,7 +1,6 @@
 import json
-import settings
 import datetime
-from polymr.file import path
+
 
 class InputReader():
     def __init__(self):
@@ -23,7 +22,7 @@ class MemInputReader(InputReader):
     def load_from_file(filename):
         start_time = datetime.datetime.now()
         itself = MemInputReader()
-        f = open(path(filename))
+        f = open(filename)
         
         for line in f:
             itself.data.append(line)
@@ -45,7 +44,7 @@ class FileInputReader(InputReader):
         self.filename = filename
     
     def read(self):
-        self.file = open(path(self.filename))
+        self.file = open(self.filename)
         return self.file
     
     def close(self):
@@ -78,7 +77,7 @@ class FileOutputWriter(OutputWriter):
         self.mode = mode
         
     def write(self,data):
-        f = open(path(self.filename), self.mode)
+        f = open(self.filename, self.mode)
         for key,value in data:
             f.write(self.dumps_output_value(key,value))
         f.close()

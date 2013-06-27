@@ -3,7 +3,7 @@ import sys
 from itertools import groupby
 from operator import itemgetter
 from polymr import load_from_classname
-import json
+import cjson
 
 def read(f):
     for line in f:
@@ -24,17 +24,18 @@ if __name__ == '__main__':
     cache_file = sys.argv[3]
      
     mapred = load_from_classname(mod_name,class_name)
-    mapred.params = json.load(open(cache_file))
-    mapred.verbose = False
+    mapred.params = cjson.decode(open(cache_file).read())
     mapred.streamming = True
  
-data = read(sys.stdin)
+    data = read(sys.stdin)
     
-for key, group in groupby(data, itemgetter(0)):
-    values = [json.loads(item[1]) for item in group]
+    def reduce_line(kv):
+        key,group = kv
+        values = [cjson.decode(item[1]) for item in group]
+        
+        if 'reduce' in dir(mapred):
+            mapred.reduce(key,list(values))
+        else:
+            print "%s;%s" % (key, cjson.encode(values))
     
-    if 'reduce' in dir(mapred):
-        mapred.reduce(key,list(values))
-    else:
-        print "%s;%s" % (key, json.dumps(values))
-
+    map(reduce_line, groupby(data, itemgetter(0)))

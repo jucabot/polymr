@@ -3,11 +3,8 @@ from polymr.inout import FileInputReader, FileOutputWriter
 import datetime
 import subprocess
 import uuid
-from polymr.file import parse_filenames, path
-import polymr.mem
-import json
-from polymr import settings, mem
-import sys
+import cjson
+from polymr import mem
 import inspect
   
 class LocalHadoopEngine():
@@ -29,19 +26,19 @@ class LocalHadoopEngine():
         
         start_time = datetime.datetime.now()
         
-        assert isinstance(input_reader, FileInputReader), "input reader has to be FileInputReader"
+        assert isinstance(input_reader, FileInputReader), "ERROR: input reader has to be FileInputReader"
                
         
-        print "start job %s on local hadoop" % (self._mapred.__class__.__name__)
+        print "INFO: start job %s on local hadoop" % (self._mapred.__class__.__name__)
         
         #store params to broadcast to hadoop
-        cache_filename = path(settings.HADOOP["dcache-directory"]) + "/" + str(uuid.uuid1())
+        cache_filename = '/var/tmp/' + str(uuid.uuid1())
         f = open(cache_filename,mode='w')
-        json.dump(self._mapred.params,f)
+        f.write(cjson.encode(self._mapred.params))
         f.close()
         
         #dummy hadoop simulation as command pipes
-        cmds = "cat %s | python -m polymr.hadoop.mapper %s %s %s" % (path(input_reader.filename),self._module_name,self._class_name,cache_filename)
+        cmds = "cat %s | python -m polymr.hadoop.mapper %s %s %s" % (input_reader.filename,self._module_name,self._class_name,cache_filename)
         if "combine" in dir(self._mapred):
             cmds += "| python -m polymr.hadoop.combiner %s %s %s" % (self._module_name,self._class_name,cache_filename)
 
@@ -50,16 +47,19 @@ class LocalHadoopEngine():
         if "reduce" in dir(self._mapred):
             cmds += "| python -m polymr.hadoop.reducer %s %s %s" % (self._module_name,self._class_name,cache_filename)
         
-        #cmds += "> %s" % path(self._mapred.output_file)
+        
 
-        print cmds
+        print "INFO: %s" % cmds
         output =  subprocess.check_output(cmds,shell=True)
         
-        for line in output.strip().split("\n"):
+        def load_line(line):
             key, value = line.split(";")
-            self._mapred.data_reduced[key] = [json.loads(value)]
+            self._mapred.data_reduced[key] = [cjson.decode(value)]
+            
+        map(load_line,output.strip().split("\n"))
+            
         
         output_writer.write(self._mapred.post_reduce())
         
-        print "end job %s in %s with mem size of %d"  % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self))
+        print "INFO: end job %s in %s with mem size of %d"  % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self))
     
