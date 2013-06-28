@@ -42,6 +42,8 @@ class SingleCoreEngine():
         
         print "INFO: end job %s in %s with mem size of %d" % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self._mapred))
     
+    
+    
 def q_run_mapper(mapred_mod, mapred_class,mapred_params, in_queue, out_queue,log_queue):
     
     try:
@@ -108,8 +110,6 @@ class MultiCoreEngine():
         self._in_queue = Queue()
         self._out_queue = Queue()
         self._log_queue = Queue()
-        
-
         
         if name == "mapper":
             fn = q_run_mapper
@@ -195,37 +195,32 @@ class MultiCoreEngine():
     
     def _run_map(self,cpu,cache_line,input_reader ):
         
-        map_len = 0
-        lines = []
-
         self._start("mapper",cpu, self._mapred.__class__.__module__,self._mapred.__class__.__name__ ,self._mapred.params)
     
         try:
+            map_len = 0
+            lines = []
+            lines_len = 0
             f = input_reader.read()
-        
+              
             for line in f:
-                try:
-                    print self._log_queue.get_nowait()
-                except Empty:
-                    pass
-                
-                lines_len = len(lines)
                 if  lines_len > 0 and lines_len % cache_line == 0:
                     self._send_lines(lines, cpu, lines_len)        
                     lines = []
+                    lines_len = 0
                
                 lines.append(line)
+                lines_len += 1
                 map_len += 1
-                    
+                 
             input_reader.close()
             
-            lines_len = len(lines)
             self._send_lines(lines, cpu, lines_len)
             
             self._stop()
             
-            for data in self._get_data_chunks():
-                self._merge_data(data)
+            map(self._merge_data, self._get_data_chunks())
+                
                 
             self._terminate()
             

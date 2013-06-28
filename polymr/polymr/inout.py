@@ -1,5 +1,7 @@
 import json
 import datetime
+import os
+from polymr import mem
 
 
 class InputReader():
@@ -10,6 +12,9 @@ class InputReader():
         pass
     
     def close(self):
+        pass
+    
+    def get_estimated_size(self):
         pass
 
 class MemInputReader(InputReader):
@@ -36,6 +41,9 @@ class MemInputReader(InputReader):
     def close(self):
         pass
     
+    def get_estimated_size(self):
+        return len(self.data), self.data[:999] if len(self.data)>1000 else self.data
+    
 class FileInputReader(InputReader):
     file = None
     filename = None
@@ -50,7 +58,24 @@ class FileInputReader(InputReader):
     def close(self):
         if self.file != None:
             self.file.close()
-             
+    
+    def get_estimated_size(self):
+        sample = []
+        sample_size = 1000
+        file_size = os.stat(self.filename).st_size
+        f = open(self.filename)
+        count = 0
+        line_size = 0
+        for line in f:
+            count +=1
+            line_size += len(line)
+            sample.append(line)
+            if count >= sample_size:
+                break
+        
+        f.close()
+        
+        return int(sample_size * float(file_size) / float(line_size)), sample
 
 class OutputWriter():
     
