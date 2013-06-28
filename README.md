@@ -1,5 +1,5 @@
-#Polymr|Python Polymorphic MapReduce
-BSD License
+#Python Polymorphic MapReduce
+Polymr is under BSD License
 
 ##What the fuck?
 In the field of Big data analytics and data science, **some dataset are huge, some are not so big** (many Mb or Gb).
