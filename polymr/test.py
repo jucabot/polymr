@@ -72,7 +72,7 @@ def test(mapred):
    
 if __name__ == '__main__':
 
-    sample_input = FileInputReader("/home/predictiveds/polymr_samples/sample.txt")
+    sample_input = FileInputReader("___your file path__")
     
     out = MemOutputWriter()
     
