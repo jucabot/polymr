@@ -85,6 +85,7 @@ if __name__ == '__main__':
     gen_input_file_sample(sample_file_path, nloc=1000000)
     
     sample_input = FileInputReader(sample_file_path)
+   
     
     out = MemOutputWriter()
     
