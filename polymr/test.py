@@ -5,6 +5,7 @@ import cProfile as profile
 from polymr.inout import FileInputReader, MemOutputWriter, MemInputReader
 from polymr.mapreduce import MapReduce
 import time
+from uuid import uuid1
 
 class Count(MapReduce):
     """
@@ -69,10 +70,21 @@ def test(mapred):
         mapred.run(sample_input,out,engine="local-hadoop")
     except:
         pass
-   
+
+def gen_input_file_sample(path,nloc=1000000):
+    print "Generate a sample file of %d lines for %d Mbytes" % (nloc,nloc*19/100000)
+    f = open(path,mode='w')
+    map(lambda n: f.write(''.join(map(lambda i: str(i),range(100))) + '\n'),range(nloc))
+    f.close()
+    
+
 if __name__ == '__main__':
 
-    sample_input = FileInputReader("/home/predictiveds/polymr_samples/sample.txt")
+    #Generate sample file
+    sample_file_path = "/var/tmp/%s" % str(uuid1())
+    gen_input_file_sample(sample_file_path, nloc=1000000)
+    
+    sample_input = FileInputReader(sample_file_path)
     
     out = MemOutputWriter()
     
