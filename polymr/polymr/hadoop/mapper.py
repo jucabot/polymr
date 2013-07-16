@@ -7,6 +7,8 @@ Created on 3 nov. 2012
 import sys
 from polymr import load_from_classname
 import cjson
+from types import GeneratorType
+from polymr.hadoop import stream_kv
 
 def check_usage():
     return len(sys.argv) == 4
@@ -26,7 +28,8 @@ if __name__ == '__main__':
     mapred.params = cjson.decode(open(cache_file).read())
     mapred.streamming = True
     
-    map(mapred.map,sys.stdin)
+   
+    map(lambda line : stream_kv(mapred.map(line)),sys.stdin)
         
    
     

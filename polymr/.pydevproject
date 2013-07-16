@@ -7,4 +7,11 @@
 <path>/polymr</path>
 </pydev_pathproperty>
 <pydev_property name="org.python.pydev.PYTHON_PROJECT_VERSION">python 2.7</pydev_property>
+<pydev_pathproperty name="org.python.pydev.PROJECT_EXTERNAL_SOURCE_PATH">
+<path>${PYSPARK}</path>
+</pydev_pathproperty>
+<pydev_variables_property name="org.python.pydev.PROJECT_VARIABLE_SUBSTITUTION">
+<key>PYSPARK</key>
+<value>/home/predictiveds/spark-0.7.0/python</value>
+</pydev_variables_property>
 </pydev_project>

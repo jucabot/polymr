@@ -4,6 +4,7 @@ from itertools import groupby
 from operator import itemgetter
 import cjson
 from polymr import load_from_classname
+from polymr.hadoop import stream_kv
 
 def read(f):
     for line in f:
@@ -34,9 +35,11 @@ if __name__ == '__main__':
         values = [cjson.decode(item[1]) for item in group]
         
         if 'combine' in dir(mapred):
-            mapred.combine(key,list(values))
+            kv = mapred.combine(key,list(values))
         else:
-            print "%s;%s" % (key, cjson.encode(values))
+            kv = (key,values)
+            
+        stream_kv(kv)
         
     map(combine, groupby(data, itemgetter(0)))
 

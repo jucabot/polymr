@@ -6,6 +6,11 @@ from polymr.inout import FileInputReader, MemOutputWriter, MemInputReader
 from polymr.mapreduce import MapReduce
 import time
 from uuid import uuid1
+from pyspark.context import SparkContext
+
+from polymr import load_from_modclassname
+import inspect
+from multiprocessing import cpu_count
 
 class Count(MapReduce):
     """
@@ -13,63 +18,67 @@ class Count(MapReduce):
     """
     
     def map(self, text):
-        self.collect('count',1)
+        return [('count',1)]
                 
     def combine(self, key, values):
-        self.compact(key, sum(values))
+        return (key, sum(values))
         
     def reduce(self, key, values):
-        self.emit(key, sum(values))
+        return (key, sum(values))
         
 class CountNoCombine(MapReduce):
     
     def map(self, text):
-        self.collect('count',1)
+        return [('count',1)]
         
     def reduce(self, key, values):
-        self.emit(key, sum(values))
+        return (key, sum(values))
 
 class LongCount(MapReduce):
     
     
     def map(self, text):
         time.sleep(1.0/10000.0)
-        self.collect('count',1)
+        return [('count',1)]
                 
     def combine(self, key, values):
-        self.compact(key, sum(values))
+        return (key, sum(values))
         
     def reduce(self, key, values):
-        self.emit(key, sum(values))
+        return (key, sum(values))
 
 class GroupBy(MapReduce):
     
     
     def map(self, text):
-        
-        for i in range(1000):
-            self.collect('count_%s' % str(i),1)
+        return [('count_%s' % str(i),1) for i in range(1000)]
                 
     def combine(self, key, values):
-        self.compact(key, sum(values))
+        return (key, sum(values))
         
     def reduce(self, key, values):
-        self.emit(key, sum(values))
+        return (key, sum(values))
 
-def test(mapred):
+def test(mapred,test_val,options={}):
     print "Test engine - Single core"
-    mapred.run(sample_input,out,debug=True)
-    
+    mapred.run(sample_input,out,debug=True,options=options)
+    assert out.data[0][1][0] == test_val
 
     print "Test engine - multi core"
     #profile.runctx('mapred.run(sample_input,out)', globals(), locals())
-    mapred.run(sample_input,out)
+    mapred.run(sample_input,out,options=options)
+    assert out.data[0][1][0] == test_val
     
-    try:
-        print "Test engine - local hadoop"
-        mapred.run(sample_input,out,engine="local-hadoop")
-    except:
-        pass
+    
+    print "Test engine - local hadoop"
+    mapred.run(sample_input,out,engine="local-hadoop",options=options)
+    assert out.data[0][1][0] == test_val
+    
+    print "Test engine - spark"
+    mapred.run(sample_input,out,engine="spark",options=options)
+    assert out.data[0][1][0] == test_val
+        
+    
 
 def gen_input_file_sample(path,nloc=1000000):
     print "Generate a sample file of %d lines for %d Mbytes" % (nloc,nloc*19/100000)
@@ -80,9 +89,13 @@ def gen_input_file_sample(path,nloc=1000000):
 
 if __name__ == '__main__':
 
+    
     #Generate sample file
     sample_file_path = "/var/tmp/%s" % str(uuid1())
-    gen_input_file_sample(sample_file_path, nloc=1000000)
+    nloc=1000000
+    gen_input_file_sample(sample_file_path, nloc)
+    
+
     
     sample_input = FileInputReader(sample_file_path)
    
@@ -90,11 +103,17 @@ if __name__ == '__main__':
     out = MemOutputWriter()
     
     
+    sc = SparkContext('local[%s]' % cpu_count(),'polymr job')
+    options = {'spark-context': sc}
+    
+    
     print "Test Count mapred"
     engine, diags = Count().profile(sample_input)
     print "Recommended engine : %s" % engine
     print diags
-    test(Count())
+    test(Count(),nloc,options)
+    
+    
     
     print "**********************"
     
@@ -102,7 +121,7 @@ if __name__ == '__main__':
     engine, diags = LongCount().profile(sample_input)
     print "Recommended engine : %s" % engine
     print diags
-    test(LongCount())
+    test(LongCount(),nloc,options)
     
     print "**********************"
       
@@ -110,13 +129,13 @@ if __name__ == '__main__':
     engine, diags = CountNoCombine().profile(sample_input)
     print "Recommended engine : %s" % engine
     print diags
-    test(CountNoCombine())
+    test(CountNoCombine(),nloc,options)
     
     print "**********************"
     print "Test  GroupBy mapred"
     engine, diags = GroupBy().profile(sample_input)
     print "Recommended engine : %s" % engine
     print diags
-    test(GroupBy())
+    test(GroupBy(),nloc,options)
     
     print "Test completed"

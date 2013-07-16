@@ -4,11 +4,19 @@ from polymr.engine.hadoop import LocalHadoopEngine
 from polymr.engine.smp import SingleCoreEngine, MultiCoreEngine
 from polymr.inout import MemInputReader
 import time
-from polymr import mem
+from polymr import mem, load_from_classname
+from polymr.engine.spark import SparkEngine
+from types import GeneratorType
+
+try:
+    from pyspark.context import SparkContext
+except ImportError:
+    pass
 
 SINGLE_CORE = "single-core"
 MULTI_CORE = "multi-core"
 LOCAL_HADOOP = "local-hadoop"
+SPARK = "spark"
 
 class MapReduce():
     """ Abstract class for Map Reduce job
@@ -34,30 +42,43 @@ class MapReduce():
         self.data_reduced = {}    
         self.check_usage()
     
+    
+    
     def post_reduce(self):
         return self.data_reduced.iteritems()
     
-    def run_map(self, input_reader):          
-        map(self.map,input_reader.read())
+    def run_map(self, input_reader):
+        
+        def collect_line(kv):
+            if isinstance(kv,list):
+                map(lambda item : self.collect(item[0],item[1]), kv)
+            else:
+                key,value = kv
+                self.collect(key, value)
+            
+                  
+        map(lambda line : collect_line(self.map(line)),input_reader.read())
+        
         input_reader.close()
         
     
     def run_combine(self, data):
         
-        def combine_line(kv):
-            key,values = kv
-            self.combine(key,values)
-
-        map(combine_line,data)
+        def compact_line(kv):
+            key,value = kv
+            self.compact(key, value)
+            
+        map(lambda kv : compact_line(self.combine(kv[0],kv[1])),data)
         
+       
     
     def run_reduce(self, data):
        
         def reduce_line(kv):
             key,values = kv
-            self.reduce(key,values)
+            self.emit(key,values)
 
-        map(reduce_line,data)
+        map(lambda kv : reduce_line(self.reduce(kv[0],kv[1])),data)
            
             
     def reset(self):
@@ -68,7 +89,7 @@ class MapReduce():
         if "map" not in dir(self):
             raise Exception("ERROR: You have to implement a map() method")
         
-    def run(self,input_reader,output_writer,engine=None,debug=False):
+    def run(self,input_reader,output_writer,engine=None,debug=False,options={}):
         cpu = cpu_count()
         
         self.reset()
@@ -76,13 +97,20 @@ class MapReduce():
         if engine == LOCAL_HADOOP:
             engine = LocalHadoopEngine(self)
             engine.run(input_reader, output_writer)
+        elif engine == SPARK:
+            if "spark-context" not in options:
+                sc = SparkContext('local','polymr job')
+            else:
+                sc = options['spark-context']
+            engine = SparkEngine(self,sc)
+            engine.run(input_reader, output_writer)
         elif cpu == 1 or debug or engine == SINGLE_CORE:
             engine = SingleCoreEngine(self)
             engine.run(input_reader, output_writer)
         else:
             engine = MultiCoreEngine(self)
             engine.run(input_reader, output_writer,cpu-1)
-        
+    
     def collect(self, key, value):
         if self.streamming:
             print "%s;%s" % (str(key),cjson.encode(value))
@@ -94,13 +122,14 @@ class MapReduce():
                 self.data[key].append(value)
             except KeyError:
                 self.data[key] = [value]
-                
+    
+            
     def compact(self, key, value):
         if self.streamming:
             print "%s;%s" % (str(key),cjson.encode(value))
         else:
             self.data[key] = [value]
-   
+
     def emit(self, key, value):
         if self.streamming:
             print "%s;%s" % (str(key),cjson.encode(value))
