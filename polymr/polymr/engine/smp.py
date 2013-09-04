@@ -2,11 +2,19 @@ import traceback
 from multiprocessing import cpu_count
 import datetime
 import math
-from polymr import merge_kv_dict, load_from_classname, mem
+from polymr import load_from_classname, mem
 from polymr.inout import MemInputReader
 from multiprocessing.process import Process
 from multiprocessing.queues import Queue
-from Queue import Empty
+
+
+def merge_kv_dict(data,data_to_merge):
+    for (key, value) in data_to_merge.items():
+            try:
+                data[key].extend(value)
+            except KeyError:
+                data[key] = value
+    return data
 
 
 class SingleCoreEngine():
