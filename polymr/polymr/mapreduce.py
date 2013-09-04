@@ -187,7 +187,7 @@ class MapReduce():
                     diagnostics['estimated-delay'] = total_size * mean_map_delay / hadoop_nodes
                 else:
                     engine = MULTI_CORE
-                    diagnostics['estimated-delay'] = total_size * mean_map_delay / core
+                    diagnostics['estimated-delay'] = total_size * mean_map_delay / (core if core > 0 else 1)
             else:
                 engine = SINGLE_CORE 
                 diagnostics['estimated-delay'] = total_size * mean_map_delay

@@ -7,8 +7,6 @@ from polymr.mapreduce import MapReduce
 import time
 from uuid import uuid1
 from pyspark.context import SparkContext
-
-from polymr import load_from_modclassname
 import inspect
 from multiprocessing import cpu_count
 
@@ -51,7 +49,7 @@ class GroupBy(MapReduce):
     
     
     def map(self, text):
-        return [('count_%s' % str(i),1) for i in range(1000)]
+        return [('count_%s' % str(i),1) for i in range(10)]
                 
     def combine(self, key, values):
         return (key, sum(values))
@@ -92,7 +90,7 @@ if __name__ == '__main__':
     
     #Generate sample file
     sample_file_path = "/var/tmp/%s" % str(uuid1())
-    nloc=1000000
+    nloc=10000
     gen_input_file_sample(sample_file_path, nloc)
     
 
