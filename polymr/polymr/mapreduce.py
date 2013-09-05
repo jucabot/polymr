@@ -14,7 +14,6 @@ except ImportError:
 
 SINGLE_CORE = "single-core"
 MULTI_CORE = "multi-core"
-LOCAL_HADOOP = "local-hadoop"
 SPARK = "spark"
 HADOOP = "hadoop"
 
@@ -22,14 +21,14 @@ class MapReduce():
     """ Abstract class for Map Reduce job
     def map(self, text):
         [...]
-        self.collect(key,value)
+        return (key,value) #or return [(key,value),...]
 
     def combine(self, key, values):
         [...]
-        self.compact(key,values)
+        return (key,value) #or return [(key,value),...]
     def reduce(self, key, values):
         [...]
-        self.emit(key,values)
+        return (key,value) #or return [(key,value),...]
     """
     
     data = None
@@ -41,8 +40,6 @@ class MapReduce():
         self.data = {}
         self.data_reduced = {}    
         self.check_usage()
-    
-    
     
     def post_reduce(self):
         return self.data_reduced.iteritems()
@@ -94,10 +91,8 @@ class MapReduce():
         
         self.reset()
         
-        if engine == LOCAL_HADOOP: #dead
-            engine = LocalHadoopEngine(self)
-            engine.run(input_reader, output_writer)
-        elif engine == HADOOP:
+        
+        if engine == HADOOP:
             engine = HadoopEngine(self)
             engine.run(input_reader, output_writer)
         elif engine == SPARK:
@@ -179,14 +174,14 @@ class MapReduce():
        
         
         if map_data_mem >= max_memory:
-            engine= LOCAL_HADOOP #or Hadoop
+            engine= HADOOP 
             diagnostics['estimated-delay'] = total_size * mean_map_delay / hadoop_nodes
         else:
             
             if mean_map_delay >= 1.0e-4:
                 
                 if map_data_mem * core >= max_memory:
-                    engine = LOCAL_HADOOP #or Hadoop
+                    engine = HADOOP 
                     diagnostics['estimated-delay'] = total_size * mean_map_delay / hadoop_nodes
                 else:
                     engine = MULTI_CORE
