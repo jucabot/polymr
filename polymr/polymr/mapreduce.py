@@ -1,12 +1,11 @@
 from multiprocessing import cpu_count
-import cjson
-from polymr.engine.hadoop import LocalHadoopEngine
+import json
+from polymr.engine.hadoop import LocalHadoopEngine, HadoopEngine
 from polymr.engine.smp import SingleCoreEngine, MultiCoreEngine
 from polymr.inout import MemInputReader
 import time
-from polymr import mem, load_from_classname
+from polymr import mem
 from polymr.engine.spark import SparkEngine
-from types import GeneratorType
 
 try:
     from pyspark.context import SparkContext
@@ -17,6 +16,7 @@ SINGLE_CORE = "single-core"
 MULTI_CORE = "multi-core"
 LOCAL_HADOOP = "local-hadoop"
 SPARK = "spark"
+HADOOP = "hadoop"
 
 class MapReduce():
     """ Abstract class for Map Reduce job
@@ -94,8 +94,11 @@ class MapReduce():
         
         self.reset()
         
-        if engine == LOCAL_HADOOP:
+        if engine == LOCAL_HADOOP: #dead
             engine = LocalHadoopEngine(self)
+            engine.run(input_reader, output_writer)
+        elif engine == HADOOP:
+            engine = HadoopEngine(self)
             engine.run(input_reader, output_writer)
         elif engine == SPARK:
             if "spark-context" not in options:
@@ -113,7 +116,7 @@ class MapReduce():
     
     def collect(self, key, value):
         if self.streamming:
-            print "%s;%s" % (str(key),cjson.encode(value))
+            print "%s;%s" % (str(key),json.dumps(value))
         else:
             if key == None:
                 key = "Undefined"
@@ -126,13 +129,13 @@ class MapReduce():
             
     def compact(self, key, value):
         if self.streamming:
-            print "%s;%s" % (str(key),cjson.encode(value))
+            print "%s;%s" % (str(key),json.dumps(value))
         else:
             self.data[key] = [value]
 
     def emit(self, key, value):
         if self.streamming:
-            print "%s;%s" % (str(key),cjson.encode(value))
+            print "%s;%s" % (str(key),json.dumps(value))
         else:
             try:
                 self.data_reduced[key].append(value)

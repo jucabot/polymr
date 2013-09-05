@@ -1,7 +1,6 @@
 import json
 import datetime
 import os
-from polymr import mem
 
 
 class InputReader():

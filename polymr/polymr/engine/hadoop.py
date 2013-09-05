@@ -3,7 +3,7 @@ from polymr.inout import FileInputReader
 import datetime
 import subprocess
 import uuid
-import cjson
+import json
 from polymr import mem
 import inspect
 from os import getenv
@@ -35,18 +35,23 @@ class LocalHadoopEngine():
         #store params to broadcast to hadoop
         cache_filename = '/var/tmp/' + str(uuid.uuid1())
         f = open(cache_filename,mode='w')
-        f.write(cjson.encode(self._mapred.params))
+        f.write(json.dumps(self._mapred.params))
         f.close()
         
+        """
+        cmds = "cp %s ." % self._source_file
+        print "INFO: %s" % cmds
+        subprocess.check_output(cmds)
+        """
         #dummy hadoop simulation as command pipes
-        cmds = "cat %s | polymr/hadoop/streamer.py mapper %s %s %s" % (input_reader.filename,self._module_name,self._class_name,cache_filename)
+        cmds = "cat %s | $POLYMR_HOME/streamer.py mapper %s %s %s" % (input_reader.filename,self._module_name,self._class_name,cache_filename)
         if "combine" in dir(self._mapred):
-            cmds += "| polymr/hadoop/streamer.py combiner %s %s %s" % ( self._module_name,self._class_name,cache_filename)
+            cmds += "| $POLYMR_HOME/streamer.py combiner %s %s %s" % ( self._module_name,self._class_name,cache_filename)
 
         cmds += "|sort"
 
         if "reduce" in dir(self._mapred):
-            cmds += "| polymr/hadoop/streamer.py reducer %s %s %s" % (self._module_name,self._class_name,cache_filename)
+            cmds += "| $POLYMR_HOME/streamer.py reducer %s %s %s" % (self._module_name,self._class_name,cache_filename)
         
         
 
@@ -55,7 +60,7 @@ class LocalHadoopEngine():
         
         def load_line(line):
             key, value = line.split(";")
-            self._mapred.data_reduced[key] = [cjson.decode(value)]
+            self._mapred.data_reduced[key] = [json.dumps(value)]
             
         map(load_line,output.strip().split("\n"))
             
@@ -88,41 +93,32 @@ class HadoopEngine():
         print "INFO: start job %s on hadoop" % (self._mapred.__class__.__name__)
         
         #hadoop_home
-        hadoop_home = getenv('HADOOP_HOME')
-        polymr_home = getenv('POLYMR_HOME')
+        if getenv('HADOOP_HOME') is None:
+            print "ERROR : $HADOOP_HOME have to be set to Hadoop home directory"
+            return
+        if getenv('POLYMR_HOME') is None:
+            print "ERROR : $POLYMR_HOME have to be set to polymr home directory"
+            return
         
         #store params to broadcast to hadoop
         params_file_id = str(uuid.uuid1())
         cache_filename = '/var/tmp/%s' % params_file_id 
         f = open(cache_filename,mode='w')
-        f.write(cjson.encode(self._mapred.params))
+        f.write(json.dumps(self._mapred.params))
         f.close()
         
-        #push params
+        output_id = "output-%s" % str(uuid.uuid1())
         
         #dummy hadoop simulation as command pipes
-        cmds = "cat %s | python -m polymr.hadoop.mapper %s %s %s" % (input_reader.filename,self._module_name,self._class_name,cache_filename)
+        cmds = "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*streaming*.jar -archives $POLYMR_HOME/polymr.zip#polymr -files $POLYMR_HOME/streamer.py,%s,%s -input %s -output %s -mapper 'streamer.py mapper %s %s %s'" % (self._source_file, cache_filename, input_reader.filename, output_id, self._module_name,self._class_name,params_file_id)
         if "combine" in dir(self._mapred):
-            cmds += "| python -m polymr.hadoop.combiner %s %s %s" % (self._module_name,self._class_name,cache_filename)
-
-        cmds += "|sort"
+            cmds += " -combiner 'streamer.py combiner %s %s %s'" % (self._module_name,self._class_name,params_file_id)
 
         if "reduce" in dir(self._mapred):
-            cmds += "| python -m polymr.hadoop.reducer %s %s %s" % (self._module_name,self._class_name,cache_filename)
+            cmds += " -reducer 'streamer.py reducer %s %s %s'" % (self._module_name,self._class_name,params_file_id)
         
         
-
         print "INFO: %s" % cmds
-        output =  subprocess.check_output(cmds,shell=True)
-        
-        def load_line(line):
-            key, value = line.split(";")
-            self._mapred.data_reduced[key] = [cjson.decode(value)]
-            
-        map(load_line,output.strip().split("\n"))
-            
-        
-        output_writer.write(self._mapred.post_reduce())
+        subprocess.check_output(cmds,shell=True)
         
         print "INFO: end job %s in %s with mem size of %d"  % (self._mapred.__class__.__name__, (datetime.datetime.now()-start_time),mem.asizeof(self))
-      
