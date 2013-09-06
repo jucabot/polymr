@@ -1,6 +1,4 @@
 
-from polymr.inout import FileInputReader, HdfsInputReader, MemInputReader,\
-    HdfsOutputWriter, FileOutputWriter, StdIOOutputWriter, MemOutputWriter
 import datetime
 import subprocess
 import uuid
@@ -50,19 +48,14 @@ class HadoopEngine():
         f.close()
         
         #Manage the input types
-        if isinstance(input_reader, HdfsInputReader):
-            hdfs_input = input_reader.filename
-        
-        elif isinstance(input_reader, FileInputReader):
+        if input_reader.is_distant():
+            hdfs_input = input_reader.filename        
+        else :
             hdfs_input = ".tmp/input-%s" % str(uuid.uuid1())
-            hadoop.put_file(input_reader.filename, hdfs_input)
-        elif isinstance(input_reader, MemInputReader):
-            pass # dump and put to hdfs
-        else:
-            raise TypeError("Input %s type unsupported" % str(type(input_reader)))
+            hadoop.put_file(input_reader.to_file(), hdfs_input)
             
         
-        if isinstance(output_writer, HdfsOutputWriter):
+        if output_writer.is_distant():
             output_id = output_writer.fileName
         else:
             output_id = ".tmp/output-%s" % str(uuid.uuid1())
@@ -85,22 +78,21 @@ class HadoopEngine():
             self._mapred.data_reduced[key] = [json.loads(value)]
         
         
-        if isinstance(output_writer, HdfsOutputWriter):
+        if output_writer.is_distant():
             pass # nothing to do
-        elif isinstance(output_writer, FileOutputWriter):
-            hadoop.get_file(output_id, output_writer.filename)
-        elif isinstance(output_writer, StdIOOutputWriter) or isinstance(output_writer, MemOutputWriter):
+        elif output_writer.is_memory():
             output = hadoop.cat("%s/*"% output_id)
             map(load_line,output.strip().split("\n"))
             output_writer.write(self._mapred.post_reduce())
-        else:
-            raise TypeError("Output %s type unsupported" % str(type(output_writer)))
+        else :
+            hadoop.get_file(output_id, output_writer.filename)
+
             
         #Clean up
-        if not isinstance(input_reader, HdfsInputReader) :
+        if not input_reader.is_distant() :
             hadoop.rm(hdfs_input)
         
-        if not isinstance(output_writer, HdfsOutputWriter) :
+        if not output_writer.is_distant() :
             hadoop.rm(output_id)
          
         

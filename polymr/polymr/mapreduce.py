@@ -1,11 +1,14 @@
 from multiprocessing import cpu_count
-import json
 from polymr.engine.hadoop import HadoopEngine
 from polymr.engine.smp import SingleCoreEngine, MultiCoreEngine
-from polymr.inout import MemInputReader, HdfsInputReader
 import time
 from polymr import mem
 from polymr.engine.spark import SparkEngine
+import datetime
+import uuid
+import json
+import os
+
 
 try:
     from pyspark.context import SparkContext
@@ -94,7 +97,7 @@ class MapReduce():
         if engine == None:
             engine, diags = self.profile(input_reader)
             
-        if engine == HADOOP or isinstance(input_reader, HdfsInputReader):
+        if engine == HADOOP or input_reader.is_distant():
             engine = HadoopEngine(self)
             engine.run(input_reader, output_writer)
         elif engine == SPARK:
@@ -154,15 +157,14 @@ class MapReduce():
         
         diagnostics = {}
         
-        if isinstance(input_reader, HdfsInputReader):
+        if input_reader.is_distant():
             return HADOOP, diagnostics
         
         
-        total_size,sample = input_reader.get_estimated_size()
-        sample_size = len(sample)
+        total_size,sample_input = input_reader.get_estimated_size()
+        sample_size = len(sample_input.data)
         map_delay = 0.0
-        is_mem_input = isinstance(input_reader,MemInputReader)
-        sample_input = MemInputReader(data=sample)
+        
         
         self.reset()
         
@@ -180,8 +182,7 @@ class MapReduce():
         diagnostics['estimated-input-size'] = total_size
         diagnostics['mean-map-delay'] = mean_map_delay
         diagnostics['estimated-mem-size'] = map_data_mem
-        diagnostics['is-mem-input'] = is_mem_input
-       
+        
         
         if map_data_mem >= max_memory:
             engine= HADOOP 
@@ -202,5 +203,201 @@ class MapReduce():
         
         return engine,diagnostics
         
+
+
+
+
+class InputReader():
+    def __init__(self):
+        pass
+    
+    def read(self,input_file):
+        pass
+    
+    def close(self):
+        pass
+    
+    def is_distant(self):
+        return False
+    
+    def to_file(self):
+        pass
+    
+    
+    def get_estimated_size(self):
+        pass
+    
+    def count(self,engine=None,debug=False,options={}):
+        out = MemOutputWriter()
+        Count().run(self,out,engine,debug,options)
+        return out.data[0][1][0]
         
 
+class MemInputReader(InputReader):
+    data = None
+    
+    def __init__(self,data=[]):
+        self.data = data
+    
+    
+    @staticmethod 
+    def load_from_file(filename):
+        start_time = datetime.datetime.now()
+        itself = MemInputReader()
+        f = open(filename)
+        
+        for line in f:
+            itself.data.append(line)
+        f.close()
+        print "Load file %s in %s" % (filename, datetime.datetime.now() - start_time)
+        return itself
+    
+    def to_file(self):
+        filename = '/var/tmp/%s' % str(uuid.uuid1()) 
+        f = open(filename,mode='w')
+        map(lambda item : f.write(json.dumps(item)),self.data)
+        f.close()
+        return filename
+    
+    def read(self):
+        return iter(self.data)
+    
+    def close(self):
+        pass
+    
+    def get_estimated_size(self):
+        return len(self.data), MemInputReader(self.data[:999]) if len(self.data)>1000 else self
+
+class HdfsInputReader(InputReader):
+    filename = None
+    
+    def __init__(self,filename):
+        self.filename = filename
+    
+    def is_distant(self):
+        return True
+    
+    
+    
+class FileInputReader(InputReader):
+    file = None
+    filename = None
+    
+    def __init__(self,filename):
+        self.filename = filename
+        
+    def to_file(self):
+        return self.filename
+    
+    def read(self):
+        self.file = open(self.filename)
+        return self.file
+    
+    def close(self):
+        if self.file != None:
+            self.file.close()
+    
+    def get_estimated_size(self):
+        sample = []
+        sample_size = 1000
+        file_size = os.stat(self.filename).st_size
+        f = open(self.filename)
+        count = 0
+        line_size = 0
+        for line in f:
+            count +=1
+            line_size += len(line)
+            sample.append(line)
+            if count >= sample_size:
+                break
+        
+        f.close()
+        
+        return int(sample_size * float(file_size) / float(line_size)), MemInputReader(sample)
+
+class OutputWriter():
+    
+    def __init__(self):
+        pass
+    
+    def is_distant(self):
+        return False
+    
+    def is_memory(self):
+        return False
+    
+    def write(self,data):
+        pass
+    
+    def dumps_output_value(self,key,value):
+        if len(value) == 1:
+            value = value[0]
+        if isinstance(value, str):
+            return "%s=%s\n" % (str(key),value)
+        else:
+            return  "%s=%s\n" % (str(key), json.dumps(value))
+
+class HdfsOutputWriter(OutputWriter):
+    filename = None
+    
+    def __init__(self,filename):
+        self.filename = filename
+        
+    def is_distant(self):
+        return True
+
+class FileOutputWriter(OutputWriter):
+    filename = None
+    mode = None
+    
+    def __init__(self,filename,mode='w'):
+        self.filename = filename
+        self.mode = mode
+        
+    def write(self,data):
+        f = open(self.filename, self.mode)
+        for key,value in data:
+            f.write(self.dumps_output_value(key,value))
+        f.close()
+        
+   
+class StdIOOutputWriter(OutputWriter): 
+    
+    def is_memory(self):
+        return True
+    
+    def write(self,data):
+        for key,value in data:
+            print self.dumps_output_value(key,value)
+
+class MemOutputWriter(OutputWriter):
+    data = None
+    
+    def is_memory(self):
+        return True
+    
+    def write(self,data):
+        self.data = []
+        for key,value in data:
+            self.data.append((key,value))
+        
+    def get_reader(self):
+        return MemInputReader(self.data)
+
+
+class Count(MapReduce):
+    """
+        List the count of messages
+    """
+    
+    def map(self, text):
+        return [('count',1)]
+                
+    def combine(self, key, values):
+        return (key, sum(values))
+        
+    def reduce(self, key, values):
+        return (key, sum(values))
+
+    
+    

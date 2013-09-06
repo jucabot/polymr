@@ -3,7 +3,6 @@ from multiprocessing import cpu_count
 import datetime
 import math
 from polymr import load_from_classname, mem
-from polymr.inout import MemInputReader
 from multiprocessing.process import Process
 from multiprocessing.queues import Queue
 
