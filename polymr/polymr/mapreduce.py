@@ -1,8 +1,8 @@
 from multiprocessing import cpu_count
 import json
-from polymr.engine.hadoop import LocalHadoopEngine, HadoopEngine
+from polymr.engine.hadoop import HadoopEngine
 from polymr.engine.smp import SingleCoreEngine, MultiCoreEngine
-from polymr.inout import MemInputReader
+from polymr.inout import MemInputReader, HdfsInputReader
 import time
 from polymr import mem
 from polymr.engine.spark import SparkEngine
@@ -91,8 +91,10 @@ class MapReduce():
         
         self.reset()
         
-        
-        if engine == HADOOP:
+        if engine == None:
+            engine, diags = self.profile(input_reader)
+            
+        if engine == HADOOP or isinstance(input_reader, HdfsInputReader):
             engine = HadoopEngine(self)
             engine.run(input_reader, output_writer)
         elif engine == SPARK:
@@ -105,13 +107,15 @@ class MapReduce():
         elif cpu == 1 or debug or engine == SINGLE_CORE:
             engine = SingleCoreEngine(self)
             engine.run(input_reader, output_writer)
-        else:
+        elif engine == MULTI_CORE:
             engine = MultiCoreEngine(self)
             engine.run(input_reader, output_writer,cpu-1)
+        
+            
     
     def collect(self, key, value):
         if self.streamming:
-            print "%s;%s" % (str(key),json.dumps(value))
+            print "%s;%s" % (key,value)
         else:
             if key == None:
                 key = "Undefined"
@@ -124,13 +128,13 @@ class MapReduce():
             
     def compact(self, key, value):
         if self.streamming:
-            print "%s;%s" % (str(key),json.dumps(value))
+            print "%s;%s" % (key,value)
         else:
             self.data[key] = [value]
 
     def emit(self, key, value):
         if self.streamming:
-            print "%s;%s" % (str(key),json.dumps(value))
+            print "%s;%s" % (key,value)
         else:
             try:
                 self.data_reduced[key].append(value)
@@ -146,12 +150,18 @@ class MapReduce():
         @return: recommanded engine name, diagnostic data
         
         """
+
+        
         diagnostics = {}
+        
+        if isinstance(input_reader, HdfsInputReader):
+            return HADOOP, diagnostics
+        
+        
         total_size,sample = input_reader.get_estimated_size()
         sample_size = len(sample)
         map_delay = 0.0
         is_mem_input = isinstance(input_reader,MemInputReader)
-        
         sample_input = MemInputReader(data=sample)
         
         self.reset()

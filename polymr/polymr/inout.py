@@ -42,6 +42,13 @@ class MemInputReader(InputReader):
     
     def get_estimated_size(self):
         return len(self.data), self.data[:999] if len(self.data)>1000 else self.data
+
+class HdfsInputReader(InputReader):
+    filename = None
+    
+    def __init__(self,filename):
+        self.filename = filename
+    
     
 class FileInputReader(InputReader):
     file = None
@@ -91,6 +98,14 @@ class OutputWriter():
             return "%s=%s\n" % (str(key),value)
         else:
             return  "%s=%s\n" % (str(key), json.dumps(value))
+
+class HdfsOutputWriter(OutputWriter):
+    filename = None
+    
+    def __init__(self,filename):
+        self.filename = filename
+        
+
 
 class FileOutputWriter(OutputWriter):
     filename = None
