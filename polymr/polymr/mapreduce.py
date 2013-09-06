@@ -231,7 +231,23 @@ class InputReader():
         out = MemOutputWriter()
         Count().run(self,out,engine,debug,options)
         return out.data[0][1][0]
+    
+    def transform(self,mapred,out=None, engine=None,debug=False,options={}):
+        if out is None:
+            if isinstance(self,FileInputReader):
+                out = FileOutputWriter('/var/tmp/%s' % str(uuid.uuid1()))
+            elif isinstance(self,HdfsInputReader):
+                out = HdfsOutputWriter('/.tmp/%s' % str(uuid.uuid1()))
+            else:
+                out = MemOutputWriter()
         
+        mapred.run(self,out,engine,debug,options)
+        return out
+
+    def compute(self,mapred,engine=None,debug=False,options={}):
+        out = MemOutputWriter()
+        mapred.run(self,out,engine,debug,options)
+        return out
 
 class MemInputReader(InputReader):
     data = None
@@ -346,6 +362,9 @@ class HdfsOutputWriter(OutputWriter):
     def is_distant(self):
         return True
 
+    def __str__(self):
+        return "%s - HDFS file name : %s" % (type(self),self.filename)
+    
 class FileOutputWriter(OutputWriter):
     filename = None
     mode = None
@@ -359,7 +378,10 @@ class FileOutputWriter(OutputWriter):
         for key,value in data:
             f.write(self.dumps_output_value(key,value))
         f.close()
-        
+    
+    def __str__(self):
+        return "%s - file name : %s" % (type(self),self.filename)
+    
    
 class StdIOOutputWriter(OutputWriter): 
     
@@ -384,6 +406,8 @@ class MemOutputWriter(OutputWriter):
     def get_reader(self):
         return MemInputReader(self.data)
 
+    def __str__(self):
+        return "%s - Memory object : %s" % (type(self),self.data)
 
 class Count(MapReduce):
     """
@@ -400,4 +424,6 @@ class Count(MapReduce):
         return (key, sum(values))
 
     
-    
+# apply
+
+# filter
