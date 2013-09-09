@@ -47,6 +47,10 @@ class MapReduce():
     def post_reduce(self):
         return self.data_reduced.iteritems()
     
+    def run_map_on_data(self,data):
+        input_data = MemInputReader(data)     
+        self.run_map(input_data)
+    
     def run_map(self, input_reader):
         
         def collect_line(kv):
@@ -247,7 +251,7 @@ class InputReader():
     def compute(self,mapred,engine=None,debug=False,options={}):
         out = MemOutputWriter()
         mapred.run(self,out,engine,debug,options)
-        return out
+        return out.data
 
 class MemInputReader(InputReader):
     data = None

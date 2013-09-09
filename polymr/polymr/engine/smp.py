@@ -65,8 +65,8 @@ def q_run_mapper(mapred_mod, mapred_class,mapred_params, in_queue, out_queue,log
                 break
             else:
                 #log_queue.put("INFO: map %d lines" % len(data))
-                input_data = MemInputReader(data)     
-                mapred.run_map(input_data)
+                    
+                mapred.run_map_on_data(data)
         
         if "combine" in dir(mapred):
             mapred.run_combine(mapred.data.items())
