@@ -8,6 +8,7 @@ import datetime
 import uuid
 import json
 import os
+import types
 
 
 try:
@@ -37,7 +38,6 @@ class MapReduce():
     data = None
     data_reduced = None
     params = {}
-    streamming = False
     
     def __init__(self):
         self.data = {}
@@ -48,13 +48,13 @@ class MapReduce():
         return self.data_reduced.iteritems()
     
     def run_map_on_data(self,data):
-        input_data = MemInputReader(data)     
+        input_data = MemInput(data)     
         self.run_map(input_data)
     
     def run_map(self, input_reader):
         
         def collect_line(kv):
-            if isinstance(kv,list):
+            if isinstance(kv,list) or isinstance(kv,types.GeneratorType):
                 map(lambda item : self.collect(item[0],item[1]), kv)
             else:
                 key,value = kv
@@ -121,33 +121,25 @@ class MapReduce():
             
     
     def collect(self, key, value):
-        if self.streamming:
-            print "%s;%s" % (key,value)
-        else:
-            if key == None:
-                key = "Undefined"
-            
-            try:
-                self.data[key].append(value)
-            except KeyError:
-                self.data[key] = [value]
-    
-            
-    def compact(self, key, value):
-        if self.streamming:
-            print "%s;%s" % (key,value)
-        else:
+        if key == None:
+            key = "Undefined"
+        
+        try:
+            self.data[key].append(value)
+        except KeyError:
             self.data[key] = [value]
 
+            
+    def compact(self, key, value):
+        self.data[key] = [value]
+
     def emit(self, key, value):
-        if self.streamming:
-            print "%s;%s" % (key,value)
-        else:
-            try:
-                self.data_reduced[key].append(value)
-            except KeyError:
-                self.data_reduced[key] = [value]
-           
+        
+        try:
+            self.data_reduced[key].append(value)
+        except KeyError:
+            self.data_reduced[key] = [value]
+       
 
     def profile(self, input_reader,max_memory=1000,core=cpu_count()-1,hadoop_nodes=4):
         """
@@ -207,15 +199,25 @@ class MapReduce():
         
         return engine,diagnostics
         
+    
+    
 
+class PassingFormatter(object):
+    options = None
+    def __init__(self,options={}):
+        self.options = options
+    
+    def format(self,iterator):
+        for row in iterator:
+            yield row
 
-
-
-class InputReader():
+class AbstractInput(object):
+    formatter = None
+    
     def __init__(self):
         pass
     
-    def read(self,input_file):
+    def read(self,input):
         pass
     
     def close(self):
@@ -227,43 +229,43 @@ class InputReader():
     def to_file(self):
         pass
     
-    
     def get_estimated_size(self):
         pass
     
     def count(self,engine=None,debug=False,options={}):
-        out = MemOutputWriter()
+        out = MemOutput()
         Count().run(self,out,engine,debug,options)
         return out.data[0][1][0]
     
     def transform(self,mapred,out=None, engine=None,debug=False,options={}):
         if out is None:
-            if isinstance(self,FileInputReader):
-                out = FileOutputWriter('/var/tmp/%s' % str(uuid.uuid1()))
-            elif isinstance(self,HdfsInputReader):
-                out = HdfsOutputWriter('/.tmp/%s' % str(uuid.uuid1()))
+            if isinstance(self,FileInput):
+                out = FileOutput('/var/tmp/%s' % str(uuid.uuid1()))
+            elif isinstance(self,HdfsInput):
+                out = HdfsOutput('/.tmp/%s' % str(uuid.uuid1()))
             else:
-                out = MemOutputWriter()
+                out = MemOutput()
         
         mapred.run(self,out,engine,debug,options)
         return out
 
     def compute(self,mapred,engine=None,debug=False,options={}):
-        out = MemOutputWriter()
+        out = MemOutput()
         mapred.run(self,out,engine,debug,options)
         return out.data
 
-class MemInputReader(InputReader):
+class MemInput(AbstractInput):
     data = None
     
     def __init__(self,data=[]):
         self.data = data
+        self.formatter = PassingFormatter()
     
     
     @staticmethod 
     def load_from_file(filename):
         start_time = datetime.datetime.now()
-        itself = MemInputReader()
+        itself = MemInput()
         f = open(filename)
         
         for line in f:
@@ -279,39 +281,41 @@ class MemInputReader(InputReader):
         f.close()
         return filename
     
+        
     def read(self):
-        return iter(self.data)
+        return self.formatter.format(iter(self.data))
     
     def close(self):
         pass
     
     def get_estimated_size(self):
-        return len(self.data), MemInputReader(self.data[:999]) if len(self.data)>1000 else self
+        return len(self.data), MemInput(self.data[:999]) if len(self.data)>1000 else self
 
-class HdfsInputReader(InputReader):
+class HdfsInput(AbstractInput):
     filename = None
     
     def __init__(self,filename):
         self.filename = filename
+        self.formatter = PassingFormatter()
     
     def is_distant(self):
         return True
     
     
-    
-class FileInputReader(InputReader):
+class FileInput(AbstractInput):
     file = None
     filename = None
     
     def __init__(self,filename):
         self.filename = filename
-        
+        self.formatter = PassingFormatter()
+    
     def to_file(self):
         return self.filename
     
     def read(self):
         self.file = open(self.filename)
-        return self.file
+        return self.formatter.format(self.file)
     
     def close(self):
         if self.file != None:
@@ -333,9 +337,38 @@ class FileInputReader(InputReader):
         
         f.close()
         
-        return int(sample_size * float(file_size) / float(line_size)), MemInputReader(sample)
+        return int(sample_size * float(file_size) / float(line_size)), MemInput(sample)
 
-class OutputWriter():
+class CsvFormatter(PassingFormatter):
+    
+    def format(self,iterator):
+        separator = self.options['separator'] if 'separator' in self.options else ','
+        for row in iterator:
+            yield row.strip().split(separator)
+
+
+class CsvFileInput(FileInput):
+    separator = None
+    fields = None
+    use_headers = None
+    
+    def __init__(self, filename,separator=',',fields={}):
+        super(CsvFileInput,self).__init__(filename)
+        #self.use_headers = use_headers
+        self.separator = separator
+        self.formatter = CsvFormatter(options={'separator' : separator})
+        self.fields = fields
+        
+    def read(self):
+        self.file = open(self.filename)
+        return self.formatter.format(self.file)
+                
+        
+    def select(self,fields=[]):
+        return CsvFileInput(self.filename,self.separator,fields)
+
+
+class AbstractOutput(object):
     
     def __init__(self):
         pass
@@ -357,7 +390,7 @@ class OutputWriter():
         else:
             return  "%s=%s\n" % (str(key), json.dumps(value))
 
-class HdfsOutputWriter(OutputWriter):
+class HdfsOutput(AbstractOutput):
     filename = None
     
     def __init__(self,filename):
@@ -367,9 +400,9 @@ class HdfsOutputWriter(OutputWriter):
         return True
 
     def __str__(self):
-        return "%s - HDFS file name : %s" % (type(self),self.filename)
+        return "HDFS file name : %s" % (self.filename)
     
-class FileOutputWriter(OutputWriter):
+class FileOutput(AbstractOutput):
     filename = None
     mode = None
     
@@ -384,10 +417,10 @@ class FileOutputWriter(OutputWriter):
         f.close()
     
     def __str__(self):
-        return "%s - file name : %s" % (type(self),self.filename)
+        return "file name : %s" % (self.filename)
     
    
-class StdIOOutputWriter(OutputWriter): 
+class StdIOOutput(AbstractOutput): 
     
     def is_memory(self):
         return True
@@ -396,7 +429,7 @@ class StdIOOutputWriter(OutputWriter):
         for key,value in data:
             print self.dumps_output_value(key,value)
 
-class MemOutputWriter(OutputWriter):
+class MemOutput(AbstractOutput):
     data = None
     
     def is_memory(self):
@@ -408,10 +441,10 @@ class MemOutputWriter(OutputWriter):
             self.data.append((key,value))
         
     def get_reader(self):
-        return MemInputReader(self.data)
+        return MemInput(self.data)
 
     def __str__(self):
-        return "%s - Memory object : %s" % (type(self),self.data)
+        return "Memory object : %s" % (self.data)
 
 class Count(MapReduce):
     """
@@ -428,6 +461,7 @@ class Count(MapReduce):
         return (key, sum(values))
 
     
-# apply
+
+    
 
 # filter

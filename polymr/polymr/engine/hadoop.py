@@ -6,7 +6,11 @@ import json
 from polymr import mem
 import inspect
 from os import getenv
+
   
+def format_function(iterator):
+    for row in iterator:
+        yield row
 
 
 class HadoopEngine():
@@ -40,6 +44,22 @@ class HadoopEngine():
             print "ERROR : $POLYMR_HOME have to be set to polymr home directory"
             raise SystemError("$POLYMR_HOME have to be set to polymr home directory")
         
+        
+        #Set metadata
+        format_class = input_reader.formatter.__class__
+        input_source_file = inspect.getfile(format_function)
+        input_module_name = format_class.__module__
+        input_class_name = format_class.__name__
+        
+        input_format_source = "format = %s" % inspect.getsource(format_function)
+        
+        self._mapred.params['_input_meta'] = { 
+                'input_class_name': input_class_name,
+                'input_module_name' : input_module_name,
+                'input_source' : input_source_file,
+                'input_options' : input_reader.formatter.options
+                } 
+        
         #store params to broadcast to hadoop
         params_file_id = str(uuid.uuid1())
         cache_filename = '/var/tmp/%s' % params_file_id 
@@ -61,7 +81,7 @@ class HadoopEngine():
             output_id = ".tmp/output-%s" % str(uuid.uuid1())
         
         #dummy hadoop simulation as command pipes
-        cmds = "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*streaming*.jar -archives $POLYMR_HOME/polymr.zip#polymr -files $POLYMR_HOME/streamer.py,%s,%s -input %s -output %s -mapper 'streamer.py mapper %s %s %s'" % (self._source_file, cache_filename, hdfs_input, output_id, self._module_name,self._class_name,params_file_id)
+        cmds = "$HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-*streaming*.jar -archives $POLYMR_HOME/polymr.zip#polymr -files $POLYMR_HOME/streamer.py,%s,%s,%s -input %s -output %s -mapper 'streamer.py mapper %s %s %s'" % (self._source_file, cache_filename, input_source_file, hdfs_input, output_id, self._module_name,self._class_name,params_file_id)
         if "combine" in dir(self._mapred):
             cmds += " -combiner 'streamer.py combiner %s %s %s'" % (self._module_name,self._class_name,params_file_id)
 
@@ -74,7 +94,7 @@ class HadoopEngine():
         
         # get result
         def load_line(line):
-            key, value = line.split(";")
+            key, value = line.split(";",2)
             self._mapred.data_reduced[key] = [json.loads(value)]
         
         
