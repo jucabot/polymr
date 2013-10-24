@@ -1,6 +1,6 @@
 from polymr.inout import AbstractOutput, PassingFormatter, AbstractInput
 from polymr.inout.mem import MemOutput
-from functions.commons import Count
+from polymr.functions.commons import Count
 
 
 class HdfsInput(AbstractInput):

@@ -57,8 +57,12 @@ class MapReduce():
                 key,value = kv
                 self.collect(key, value)
             
-                  
-        map(lambda line : collect_line(self.map(line)),input_reader.read())
+        if 'map' in dir(self):                              
+            map(lambda line : collect_line(self.map(line)),input_reader.read())
+        elif 'map_partition' in dir(self):
+            collect_line(self.map_partition(input_reader.read()))
+        else:
+            raise Exception("ERROR: You have to implement a map() ou map_partition() method")
         
         input_reader.close()
         
@@ -87,8 +91,8 @@ class MapReduce():
         self.data_reduced = {}
         
     def check_usage(self):
-        if "map" not in dir(self):
-            raise Exception("ERROR: You have to implement a map() method")
+        if "map" not in dir(self) and "map_partition" not in dir(self):
+            raise Exception("ERROR: You have to implement a map() or map_partition() method")
         
     def run(self,input_reader,output_writer,engine=None,debug=False,options={}):
         cpu = cpu_count()
@@ -162,11 +166,18 @@ class MapReduce():
         
         self.reset()
         
-        for line in sample_input.read():
+        if 'map' in dir(self):
+            for line in sample_input.read():
+                start = time.time()
+                self.map(line)
+                map_delay += time.time() - start
+        elif 'map_partition' in dir(self):
             start = time.time()
-            self.map(line)
+            self.map_partition(sample_input.read())
             map_delay += time.time() - start
-            
+        else:
+            raise Exception("ERROR: You have to implement a map() or map_partition() method")
+
         sample_input.close()
         
         mean_map_delay = map_delay / sample_size

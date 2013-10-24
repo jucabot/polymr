@@ -2,6 +2,7 @@ import json
 import uuid
 import datetime
 from polymr.inout import PassingFormatter, AbstractInput, AbstractOutput
+import sys
 
 class MemInput(AbstractInput):
     data = None
@@ -42,6 +43,16 @@ class MemInput(AbstractInput):
     
     def count(self,engine=None,debug=False,options={}):
         return len(self.data)
+
+class StdIOInput(AbstractInput):
+    io = None
+    
+    def __init__(self,io = sys.stdin):
+        self.io = io
+        self.formatter = PassingFormatter()
+
+    def read(self):
+        return self.formatter.format(self.io)
 
    
 class StdIOOutput(AbstractOutput): 

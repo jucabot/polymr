@@ -46,7 +46,11 @@ class FileInput(AbstractInput):
         Count().run(self,out,engine,debug,options)
         return out.data[0][1][0]
 
-
+    def compute(self,mapred,engine=None,debug=False,options={}):
+        out = MemOutput()
+        mapred.run(self,out,engine,debug,options)
+        return out.data
+    
 class CsvFormatter(PassingFormatter):
     
     def format(self,iterator):

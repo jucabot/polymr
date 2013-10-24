@@ -1,8 +1,13 @@
 #! /usr/bin/env python
+
 import sys
+sys.path.append('.')
+sys.path.append('./polymr')  
+
 import pickle
 import base64
 import types
+from polymr.inout.mem import StdIOInput
 
 
 try:
@@ -48,7 +53,16 @@ def mapper(mapred,meta):
     formatter = load_from_classname(meta['input_module_name'],meta['input_class_name'])
     formatter.options = meta['input_options']
     
-    map(lambda line : stream_kv(mapred.map(line)),formatter.format(sys.stdin))
+    input_source = StdIOInput()
+    input_source.formatter = formatter
+    mapred.run_map(input_source)
+    
+    for kv in mapred.data.items():
+        key = unicode(kv[0])
+        for value in kv[1]:
+            print "%s;%s" % (key,json_dump(value))
+    
+    #map(lambda line : stream_kv(mapred.map(line)),formatter.format(sys.stdin))
     
     
 
@@ -108,9 +122,7 @@ if __name__ == '__main__':
     class_name = args[2]
     cache_file = args[3]
         
-    sys.path.append('.')
-    sys.path.append('./polymr')  
-
+    
   
     mapred = load_from_classname(mod_name,class_name)
     mapred.params = json_load(open(cache_file).read())
