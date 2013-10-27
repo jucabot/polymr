@@ -3,6 +3,7 @@ import os
 from polymr.inout.mem import MemInput, MemOutput
 from polymr.functions.commons import Count
 from polymr.functions.table import FieldFrequency, FieldSummary
+from polymr.mapreduce import SINGLE_CORE
 
 class FileInput(AbstractInput):
     file = None
@@ -46,7 +47,7 @@ class FileInput(AbstractInput):
         Count().run(self,out,engine,debug,options)
         return out.data[0][1][0]
 
-    def compute(self,mapred,engine=None,debug=False,options={}):
+    def compute(self,mapred,engine=SINGLE_CORE,debug=False,options={}):
         out = MemOutput()
         mapred.run(self,out,engine,debug,options)
         return out.data

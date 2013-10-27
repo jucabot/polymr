@@ -83,3 +83,20 @@ class TypeConverter():
             
         return value    
     
+    def cast(self,type,value):
+        try:
+            
+            
+            if type == 'str' or type == 'unicode':
+                return unicode(value)
+            elif type == 'int':
+                return float(value)
+            elif type == 'float':
+                return float(value)
+            elif type == 'datetime':
+                day,month,year = value.split('-')
+                return datetime.datetime(day,month,year)
+            else:
+                return value
+        except ValueError:
+            return value

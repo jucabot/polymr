@@ -1,7 +1,57 @@
 from polymr.mapreduce import MapReduce
 from polymr.functions.type_analyzer import TypeConverter, TEXT_TYPE
+import numpy as np
+from sklearn.feature_extraction import DictVectorizer
 
-class FieldFrequency(MapReduce):
+class FeatureSet(object):
+    metadata = None
+    
+    def __init__(self,metadata):
+        self.metadata = metadata
+    
+    def get_feature_names(self):
+        return self.metadata.keys()
+    
+    def get_dataset(self,iterator,target_name=None):
+        
+        feature_names = self.get_feature_names()
+        X = []
+        y=[]
+        converter = TypeConverter()
+        for row_value in iterator:
+            row = {}
+            for name in feature_names:
+                if name == target_name:
+                    y.append(converter.cast(self.metadata[name]['type'],row_value[name]))
+                else:
+                    row[name] = converter.cast(self.metadata[name]['type'],row_value[name])
+            X.append(row)
+
+        
+        vec = DictVectorizer()
+        dataset = vec.fit_transform(X)
+        feature_names = vec.get_feature_names()
+        return y, dataset.toarray(), feature_names
+        
+    
+    def get_table(self,iterator,target_name=None):
+        
+        feature_names = self.get_feature_names()
+
+        X = []
+        y=[]
+        converter = TypeConverter()
+        for row_value in iterator:
+            row = []
+            for name in feature_names:
+                if name == target_name:
+                    y.append(converter.cast(self.metadata[name]['type'],row_value[name]))
+                else:
+                    row.append(converter.cast(self.metadata[name]['type'],row_value[name]))
+            X.append(row)
+        return np.array(X),np.array(y)
+
+class FieldMapReduce(MapReduce):
     """
     Compute Frequency distribution for each column/field
     """ 
@@ -9,6 +59,16 @@ class FieldFrequency(MapReduce):
     def _select_fields(self,row):
         for name, value in row.items():    
             yield (name ,value)
+
+    def map(self, row):
+        return self._select_fields(row)
+
+class FieldFrequency(FieldMapReduce):
+    """
+    Compute Frequency distribution for each column/field
+    """ 
+   
+   
     
     def _freq_count(self,values):
         freqs = {}
@@ -31,8 +91,6 @@ class FieldFrequency(MapReduce):
 
         return freqs
 
-    def map(self, row):
-        return self._select_fields(row)
     
     def combine(self, key, values):
         return (key,self._freq_count(values))
