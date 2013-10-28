@@ -2,6 +2,8 @@ from polymr.mapreduce import MapReduce
 from polymr.functions.type_analyzer import TypeConverter, TEXT_TYPE
 import numpy as np
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.ensemble import ExtraTreesClassifier
+from numpy.ma.core import mean
 
 class FeatureSet(object):
     metadata = None
@@ -199,4 +201,36 @@ class FieldSummary(FieldFrequency):
         return (key, self._merge_resume(values))
 
 
-# filter
+class FeatureSelector(MapReduce):
+    
+    
+    def set_target(self,target):
+        self.params['target-field'] = target
+    def get_target(self):
+        return self.params['target-field']
+        
+    def set_featureset(self,featureset):
+        self.params['featureset'] = featureset
+    
+    def get_featureset(self):
+        return self.params['featureset']
+    
+    
+    def map_partition(self, iterator):
+        target_name = self.get_target()
+        featureset = FeatureSet(self.get_featureset())
+        y,X,feature_names = featureset.get_dataset(iterator,target_name=target_name)
+        
+        
+        clf = ExtraTreesClassifier(compute_importances=True)
+        clf.fit(X,y)
+        feature_importance = clf.feature_importances_
+        for i in range(len(feature_names)):
+            yield (feature_names[i],feature_importance[i])
+                
+    def combine(self, key, values):
+        return (key, mean(values))
+        
+    def reduce(self, key, values):
+        return (key, mean(values))
+    

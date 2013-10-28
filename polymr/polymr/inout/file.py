@@ -2,8 +2,8 @@ from polymr.inout import PassingFormatter, AbstractInput, AbstractOutput
 import os
 from polymr.inout.mem import MemInput, MemOutput
 from polymr.functions.commons import Count
-from polymr.functions.table import FieldFrequency, FieldSummary
-from polymr.mapreduce import SINGLE_CORE
+from polymr.functions.feature_set import FieldFrequency, FieldSummary
+from polymr.functions.feature_set import FeatureSelector
 
 class FileInput(AbstractInput):
     file = None
@@ -47,7 +47,7 @@ class FileInput(AbstractInput):
         Count().run(self,out,engine,debug,options)
         return out.data[0][1][0]
 
-    def compute(self,mapred,engine=SINGLE_CORE,debug=False,options={}):
+    def map_reduce(self,mapred,engine=None,debug=False,options={}):
         out = MemOutput()
         mapred.run(self,out,engine,debug,options)
         return out.data
@@ -121,7 +121,41 @@ class CsvFileInput(FileInput):
             print '\n*** Feature %s ***' % name
             for k,v in sorted(feature.items()):
                 print "    %s : %s" % (k,v)
-
+        return resume
+    
+    def explain(self,target,feature_set=None, engine=None,debug=False,options={}):
+        
+        if feature_set is None:
+            feature_set = self.summary(engine, debug, options)
+        
+        out = MemOutput()
+        mapred = FeatureSelector()
+        mapred.set_target(target)
+        mapred.set_featureset(feature_set)
+        mapred.run(self,out,engine,debug,options)
+        result = {}
+        
+        def _build_result(result,kv):
+            result[kv[0]] = kv[1][0]
+        map(lambda kv : _build_result(result,kv),out.data)
+           
+        return result
+    
+    def print_explain(self,target,feature_set=None,engine=None,debug=False,options={}):
+        resume = self.explain(target,feature_set,engine, debug, options)
+        
+        def sort_func(kv1,kv2):
+            return -1*(kv1[1]-kv2[1])
+        resume = sorted(resume.items(),key=lambda value: -1*value[1])
+        
+        print '*** Feature selection to predict %s ***'  % (target)
+            
+        for (feature,score) in resume:
+            
+            print 'Feature %s : %f' % (feature,score)
+            
+        return resume
+    
 class FileOutput(AbstractOutput):
     filename = None
     mode = None
