@@ -5,17 +5,9 @@ import time
 from polymr import mem
 import types
 from polymr.inout.mem import MemInput
-from polymr.engine.spark import SparkEngine
-
-
-try:
-    from pyspark.context import SparkContext
-except ImportError:
-    pass
 
 SINGLE_CORE = "single-core"
 MULTI_CORE = "multi-core"
-SPARK = "spark"
 HADOOP = "hadoop"
 
 class MapReduce():
@@ -104,14 +96,6 @@ class MapReduce():
             
         if engine == HADOOP or input_reader.is_distant():
             engine = HadoopEngine(self)
-            engine.run(input_reader, output_writer)
-        
-        elif engine == SPARK:
-            if "spark-context" not in options:
-                sc = SparkContext('local','polymr job')
-            else:
-                sc = options['spark-context']
-            engine = SparkEngine(self,sc)
             engine.run(input_reader, output_writer)
         elif cpu == 1 or debug or engine == SINGLE_CORE:
             engine = SingleCoreEngine(self)
