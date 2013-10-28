@@ -12,9 +12,8 @@ titanic = CsvFileInput('titanic.csv')
 titanic.print_summary()
 
 #Extract the fields    
-fields = {'survived': 0, 'pclass': 1, 'sex':5, 'age':6}
+fields = {'survived': 0, 'pclass': 1, 'sex':5, 'age':6, 'sibsp':7, 'parch':8,'fare':10,'embarked':12}
 titanic =  titanic.select(fields)
-
 titanic.print_explain("survived")
 
 
