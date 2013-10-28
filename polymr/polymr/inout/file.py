@@ -24,9 +24,7 @@ class FileInput(AbstractInput):
         if self.file != None:
             self.file.close()
     
-    def get_estimated_size(self):
-        sample = []
-        sample_size = 1000
+    def get_estimated_size(self,sample_size = 1000):
         file_size = os.stat(self.filename).st_size
         f = open(self.filename)
         count = 0
@@ -34,13 +32,27 @@ class FileInput(AbstractInput):
         for line in f:
             count +=1
             line_size += len(line)
-            sample.append(line)
+            
             if count >= sample_size:
                 break
         
         f.close()
         
-        return int(sample_size * float(file_size) / float(line_size)), MemInput(sample)
+        return int(sample_size * float(file_size) / float(line_size))
+    
+    def sample(self,size=100):
+        self.file = open(self.filename)
+        sample = []
+        i=0
+        for row in self.file:
+            sample.append(row)
+            if i>=size:
+                break
+            else:
+                i+=1
+        
+        return self.formatter.format(sample)
+    
     
     def count(self,engine=None,debug=False,options={}):
         out = MemOutput()
@@ -94,6 +106,8 @@ class CsvFileInput(FileInput):
     def read(self):
         self.file = open(self.filename)
         return self.formatter.format(self.file)
+    
+    
                 
     def select(self,fields):
         return CsvFileInput(self.filename,self.separator,fields)

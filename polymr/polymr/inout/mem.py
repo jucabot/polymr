@@ -35,6 +35,9 @@ class MemInput(AbstractInput):
     def read(self):
         return self.formatter.format(iter(self.data))
     
+    def sample(self,size=100):
+        return self.data[0:size-1]
+
     def close(self):
         pass
     

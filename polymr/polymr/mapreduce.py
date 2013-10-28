@@ -127,7 +127,7 @@ class MapReduce():
             self.data_reduced[key] = [value]
        
 
-    def profile(self, input_reader,max_memory=1000,core=cpu_count()-1,hadoop_nodes=4):
+    def profile(self, input_reader,sample_size=100, max_memory=1000,core=cpu_count()-1,hadoop_nodes=4):
         """
         Profile the MapReduce job against the input reader and return recommandation + diagnostics
         @param max_memory: SMP memory limit availaible for the job in Mb (default : 1Gb)
@@ -143,26 +143,30 @@ class MapReduce():
             return HADOOP, diagnostics
         
         
-        total_size,sample_input = input_reader.get_estimated_size()
-        sample_size = len(sample_input.data)
+        total_size = input_reader.get_estimated_size()
+       
         map_delay = 0.0
-        
         
         self.reset()
         
         if 'map' in dir(self):
-            for line in sample_input.read():
+            for line in input_reader.sample(sample_size):
                 start = time.time()
                 self.map(line)
                 map_delay += time.time() - start
+                
+                
+                
         elif 'map_partition' in dir(self):
             start = time.time()
-            self.map_partition(sample_input.read())
+            self.map_partition(input_reader.sample(sample_size))
             map_delay += time.time() - start
+            
         else:
             raise Exception("ERROR: You have to implement a map() or map_partition() method")
 
-        sample_input.close()
+        
+        sample_size = sample_size if total_size >= sample_size else total_size
         
         mean_map_delay = map_delay / sample_size
         

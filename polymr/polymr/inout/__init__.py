@@ -15,7 +15,10 @@ class AbstractInput(object):
     def __init__(self):
         pass
     
-    def read(self,input):
+    def read(self):
+        pass
+    
+    def sample(self,size=100):
         pass
     
     def close(self):
