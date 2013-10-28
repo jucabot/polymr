@@ -59,10 +59,14 @@ class FileInput(AbstractInput):
         Count().run(self,out,engine,debug,options)
         return out.data[0][1][0]
 
-    def map_reduce(self,mapred,engine=None,debug=False,options={}):
+    def compute(self,mapred,engine=None,debug=False,options={}):
         out = MemOutput()
         mapred.run(self,out,engine,debug,options)
         return out.data
+    
+    def map_reduce(self,mapred,output,engine=None,debug=False,options={}):
+        mapred.run(self,output,engine,debug,options)
+        
     
 class CsvFormatter(PassingFormatter):
     
@@ -158,8 +162,7 @@ class CsvFileInput(FileInput):
     def print_explain(self,target,feature_set=None,engine=None,debug=False,options={}):
         resume = self.explain(target,feature_set,engine, debug, options)
         
-        def sort_func(kv1,kv2):
-            return -1*(kv1[1]-kv2[1])
+        
         resume = sorted(resume.items(),key=lambda value: -1*value[1])
         
         print '*** Feature selection to predict %s ***'  % (target)
