@@ -2,12 +2,12 @@
 
 import sys
 sys.path.append('.')
-sys.path.append('./polymr')  
+sys.path.append('./polymr')
 
+from polymr.inout.mem import StdIOInput
 import pickle
 import base64
 import types
-from polymr.inout.mem import StdIOInput
 
 
 try:
@@ -28,6 +28,9 @@ except ImportError:
         return json.dumps(obj)
 
 def load_from_classname(mod_name, class_name):
+    mod_name = str(mod_name)
+    class_name = str(class_name)
+    
     mod = __import__(mod_name, fromlist=[class_name])
     klass = getattr(mod, class_name)
     return klass()
@@ -49,6 +52,7 @@ def read(f):
         yield (key,value)
 
 def mapper(mapred,meta):
+    
     
     formatter = load_from_classname(meta['input_module_name'],meta['input_class_name'])
     formatter.options = meta['input_options']
@@ -121,8 +125,7 @@ if __name__ == '__main__':
     mod_name = args[1]
     class_name = args[2]
     cache_file = args[3]
-        
-    
+
   
     mapred = load_from_classname(mod_name,class_name)
     mapred.params = json_load(open(cache_file).read())
