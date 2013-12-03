@@ -2,7 +2,7 @@ from polymr.mapreduce import MapReduce
 from polymr.functions.type_analyzer import TypeConverter, TEXT_TYPE
 import numpy as np
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import ExtraTreesClassifier,ExtraTreesRegressor
 from numpy.ma.core import mean
 
 class FeatureSet(object):
@@ -13,6 +13,9 @@ class FeatureSet(object):
     
     def get_feature_names(self):
         return self.metadata.keys()
+    
+    def get_feature(self,name):
+        return self.metadata[name]
     
     def get_dataset(self,iterator,target_name=None):
         
@@ -223,6 +226,12 @@ class FeatureSelector(MapReduce):
         
         
         clf = ExtraTreesClassifier(compute_importances=True)
+        
+        if featureset.get_feature(target_name)['is-factor']:
+            clf = ExtraTreesClassifier(compute_importances=True)
+        else:
+            clf = ExtraTreesRegressor(compute_importances=True)
+    
         clf.fit(X,y)
         feature_importance = clf.feature_importances_
         for i in range(len(feature_names)):

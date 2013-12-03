@@ -1,9 +1,13 @@
 from polymr.inout import PassingFormatter, AbstractInput, AbstractOutput
 import os
 from polymr.inout.mem import MemInput, MemOutput
-from polymr.functions.commons import Count
+from polymr.functions.commons import Count, Filter, Apply
 from polymr.functions.feature_set import FieldFrequency, FieldSummary
 from polymr.functions.feature_set import FeatureSelector
+from uuid import uuid1
+import types
+import inspect
+from copy import copy, deepcopy
 
 class FileInput(AbstractInput):
     file = None
@@ -23,6 +27,8 @@ class FileInput(AbstractInput):
     def close(self):
         if self.file != None:
             self.file.close()
+    def as_output(self):
+        return FileOutput(self.filename)
     
     def get_estimated_size(self,sample_size = 1000):
         file_size = os.stat(self.filename).st_size
@@ -66,7 +72,18 @@ class FileInput(AbstractInput):
     
     def map_reduce(self,mapred,output,engine=None,debug=False,options={}):
         mapred.run(self,output,engine,debug,options)
-        
+    
+    def filter(self,filter_function, output=None,engine=None,debug=False,options={}):
+        if output is None:
+            output = self.as_output()
+            output.filename = '/var/tmp/%s' % uuid1()
+            
+        mapred = Filter()
+        mapred.set_function(filter_function)
+        mapred.run(self, output, engine, debug, options)
+            
+        return output.as_input()
+    
     
 class CsvFormatter(PassingFormatter):
     
@@ -111,6 +128,8 @@ class CsvFileInput(FileInput):
         self.file = open(self.filename)
         return self.formatter.format(self.file)
     
+    def as_output(self):
+        return CsvFileOutput(self.filename,separator=self.separator,fields=self.fields)
     
                 
     def select(self,fields):
@@ -162,7 +181,6 @@ class CsvFileInput(FileInput):
     def print_explain(self,target,feature_set=None,engine=None,debug=False,options={}):
         resume = self.explain(target,feature_set,engine, debug, options)
         
-        
         resume = sorted(resume.items(),key=lambda value: -1*value[1])
         
         print '*** Feature selection to predict %s ***'  % (target)
@@ -173,6 +191,8 @@ class CsvFileInput(FileInput):
             
         return resume
     
+        
+    
 class FileOutput(AbstractOutput):
     filename = None
     mode = None
@@ -182,10 +202,43 @@ class FileOutput(AbstractOutput):
         self.mode = mode
         
     def write(self,data):
-        f = open(self.filename, self.mode)
+        f = open(self.filename, mode=self.mode)
         for key,value in data:
             f.write(self.dumps_output_value(key,value))
         f.close()
     
     def __str__(self):
         return "file name : %s" % (self.filename)
+
+    def as_input(self):
+        return FileInput(self.filename)
+    
+class CsvFileOutput(FileOutput):
+    
+    fields = None
+    separator = None
+    
+    def __init__(self,filename,mode='w',separator=',',fields=None):
+        super(CsvFileOutput,self).__init__(filename,mode)
+        self.separator = separator
+        self.fields = fields
+    
+    def as_input(self):
+        fields = {}
+        i=0
+        #recompute the fields list
+        for key in map(lambda kv : kv[0], sorted(self.fields.items(),key=lambda value: value[1])):
+            fields[key] = i
+            i =+1
+
+        return CsvFileInput(self.filename,self.separator,fields)
+    
+    def dumps_output_value(self,key,values):
+        if self.fields is None:
+            return self.separator.join(values[0].values())
+        else:
+            out = []
+            value_list = map(lambda kv : kv[0], sorted(self.fields.items(),key=lambda value: value[1]))
+            for key in value_list:
+                out.append(values[0][key])
+            return self.separator.join(out) + '\n'

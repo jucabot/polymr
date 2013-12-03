@@ -1,4 +1,4 @@
-from polymr.mapreduce import MapReduce
+from polymr.mapreduce import MapReduce, HADOOP
 from polymr.inout.file import FileInput
 from polymr.inout.mem import MemOutput
 
@@ -23,10 +23,14 @@ def print_result(out):
     for (ticket,count) in result:
         print "%s\t : %d" % (ticket,count)
 
-titanic = FileInput('titanic.csv')
 
-mapred = TicketGrouper()
-out = MemOutput()
-mapred.run(titanic,out)
 
-print_result(out)
+if __name__ == '__main__': #dont forget this line if you use Hadoop engine
+
+    titanic = FileInput('titanic.csv')
+    
+    mapred = TicketGrouper()
+    out = MemOutput()
+    mapred.run(titanic,out,engine=HADOOP)
+    
+    print_result(out)
