@@ -15,8 +15,14 @@ if __name__ == '__main__': #dont forget this line if you use Hadoop engine
     #Extract the fields    
     fields = {'survived': 0, 'pclass': 1, 'sex':5, 'age':6, 'sibsp':7, 'parch':8,'fare':10,'embarked':12}
     titanic =  titanic.select(fields)
+
+    titanic = titanic.add_feature('is-old',"row['age'] > 60")
+    titanic.print_summary()
+    
+    
     titanic.print_explain("survived")
 
+    exit()
     
     titanic_age = titanic.filter("row['age'] != NA")
     print titanic_age.count()

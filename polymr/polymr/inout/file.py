@@ -1,13 +1,11 @@
 from polymr.inout import PassingFormatter, AbstractInput, AbstractOutput
 import os
-from polymr.inout.mem import MemInput, MemOutput
-from polymr.functions.commons import Count, Filter, Apply
-from polymr.functions.feature_set import FieldFrequency, FieldSummary
+from polymr.inout.mem import  MemOutput
+from polymr.functions.commons import Count, Filter
+from polymr.functions.feature_set import FieldFrequency, FieldSummary, Apply
 from polymr.functions.feature_set import FeatureSelector
 from uuid import uuid1
-import types
-import inspect
-from copy import copy, deepcopy
+
 
 class FileInput(AbstractInput):
     file = None
@@ -84,6 +82,7 @@ class FileInput(AbstractInput):
             
         return output.as_input()
     
+   
     
 class CsvFormatter(PassingFormatter):
     
@@ -106,7 +105,10 @@ class CsvFormatter(PassingFormatter):
                 values = {}
                 for field in fields.items():
                     name, index = field
-                    values[name] = row_values[index]
+                    try:
+                        values[name] = row_values[index]
+                    except IndexError:
+                        pass
                 yield values
 """
 Structured file separated by separator
@@ -191,7 +193,18 @@ class CsvFileInput(FileInput):
             
         return resume
     
+    def add_feature(self,name,feature_function, output=None,engine=None,debug=False,options={}):
+        if output is None:
+            output = self.as_output()
+            output.filename = '/var/tmp/%s' % uuid1()
         
+        mapred = Apply()
+        self.fields[name] = max(self.fields.values()) + 1
+        mapred.set_function(feature_function)
+        mapred.set_name(name)
+        mapred.run(self, output, engine, debug, options)
+        
+        return output.as_input() 
     
 class FileOutput(AbstractOutput):
     filename = None
@@ -229,7 +242,7 @@ class CsvFileOutput(FileOutput):
         #recompute the fields list
         for key in map(lambda kv : kv[0], sorted(self.fields.items(),key=lambda value: value[1])):
             fields[key] = i
-            i =+1
+            i +=1
 
         return CsvFileInput(self.filename,self.separator,fields)
     
@@ -240,5 +253,5 @@ class CsvFileOutput(FileOutput):
             out = []
             value_list = map(lambda kv : kv[0], sorted(self.fields.items(),key=lambda value: value[1]))
             for key in value_list:
-                out.append(values[0][key])
+                out.append(str(values[0][key]))
             return self.separator.join(out) + '\n'

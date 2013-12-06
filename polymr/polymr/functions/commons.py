@@ -59,12 +59,3 @@ class Filter(FeaturedFunction):
         for line in result:
             yield(uuid1(),line)
             
-class Apply(FeaturedFunction):
-        
-    def map_partition(self, iterator):
-        
-        apply_function = self.get_function()
-        result = map(apply_function,iterator)
-        
-        for line in result:
-            yield(uuid1(),line)

@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.ensemble import ExtraTreesClassifier,ExtraTreesRegressor
 from numpy.ma.core import mean
+from polymr.functions.commons import FeaturedFunction
+from uuid import uuid1
 
 class FeatureSet(object):
     metadata = None
@@ -242,4 +244,28 @@ class FeatureSelector(MapReduce):
         
     def reduce(self, key, values):
         return (key, mean(values))
+
+class Apply(FeaturedFunction):
+    def get_name(self):
+        return self.params['feature_name']
+
+    def set_name(self,name):
+        self.params['feature_name'] = name
     
+    def map_partition(self, iterator):
+        apply_function = self.get_function()
+        name = self.get_name()
+        tc = TypeConverter()
+        
+        def add_feature(values):
+            typed_values = {}
+            for key,value in values.items():
+                typed_values[key] = tc.type(value)
+            value_to_add = apply_function(typed_values)
+            values[name] = value_to_add
+            return values 
+        
+        result = map(add_feature,iterator)
+        
+        for line in result:
+            yield(uuid1(),line)
